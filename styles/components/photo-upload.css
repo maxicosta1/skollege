@@ -1,0 +1,61 @@
+.photo-upload-container {
+    width: 120px;
+    height: 120px;
+    border: 2px dashed var(--border-color, #ddd);
+    border-radius: 50%;
+    margin: 0 auto 1.5rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    position: relative;
+    background: var(--bg-light, #f8f9fa);
+    transition: all 0.3s ease;
+}
+
+.photo-placeholder {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+}
+
+.photo-placeholder i {
+    font-size: 2.5rem;
+    margin-bottom: 0.5rem;
+    opacity: 0.7;
+}
+
+.photo-placeholder span {
+    font-size: 0.75rem;
+    opacity: 0.8;
+    text-align: center;
+    padding: 0 0.5rem;
+    max-width: 90%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Estilo para cuando se tenga implementada la carga de fotos */
+.photo-upload-container.has-image {
+    border-style: solid;
+}
+
+.photo-upload-container.has-image .photo-placeholder {
+    display: none;
+}
+
+/* Animación suave al hover */
+.photo-upload-container:hover {
+    border-color: var(--primary-color);
+    cursor: pointer;
+}
+
+.photo-upload-container:hover .photo-placeholder {
+    color: var(--primary-color);
+}

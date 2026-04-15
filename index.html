@@ -1,0 +1,813 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Expotec 2026 - Lista Automatizada</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="styles/style.css">
+</head>
+<body>
+    <!-- ==================== PANEL LATERAL (SIDEBAR) ==================== -->
+    <div id="sidebar" class="sidebar">
+        <div class="sidebar-header">
+            <button id="closeSidebar" class="close-btn">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <nav class="sidebar-nav">
+            <ul>
+                <li>
+                    <a href="#home" class="nav-link active" data-section="home">
+                        <i class="fas fa-home"></i>
+                        <span>Home</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="#personas" class="nav-link" data-section="personas">
+                        <i class="fas fa-users"></i>
+                        <span>Personas</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="#cursos" class="nav-link" data-section="cursos">
+                        <i class="fas fa-graduation-cap"></i>
+                        <span>Cursos</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="#asistencias" class="nav-link" data-section="asistencias">
+                        <i class="fas fa-clipboard-check"></i>
+                        <span>Asistencias</span>
+                    </a>
+                </li>
+                <li id="navEstadisticas" class="nav-item-oculto" style="display: none;">
+                    <a href="#estadisticas" class="nav-link" data-section="estadisticas">
+                        <i class="fas fa-chart-pie"></i>
+                        <span>Estadísticas</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="#administracion" class="nav-link" data-section="administracion">
+                        <i class="fas fa-cogs"></i>
+                        <span>Administración</span>
+                    </a>
+                </li>
+            </ul>
+        </nav>
+    </div>
+
+    <!-- Overlay para cerrar panel en móviles -->
+    <div id="overlay" class="overlay"></div>
+
+    <!-- ==================== CONTENIDO PRINCIPAL ==================== -->
+    <div class="main-content">
+        <header class="header">
+            <button id="menuToggle" class="menu-toggle">
+                <i class="fas fa-bars"></i>
+            </button>
+            <div id="userInfo" class="user-info" style="display: none;">
+                <i class="fas fa-user-shield"></i>
+                <span id="userName"></span>
+                <button id="btnLogoutHeader" class="btn-logout-header">
+                    <i class="fas fa-sign-out-alt"></i>
+                </button>
+            </div>
+        </header>
+
+        <main class="content">
+            <!-- ==================== SECCIÓN HOME ==================== -->
+            <section id="home" class="section active">
+                <div class="main-title-container">
+                    <h2 class="main-title">LISTA AUTOMATIZADA POR RFID</h2>
+                </div>
+                <div class="section-content">
+                    <div class="welcome-card">
+                        <h3>Bienvenido a Expotec 2026</h3>
+                        <p>Este sistema permite gestionar la asistencia de alumnos mediante tecnología RFID de forma automatizada y eficiente.</p>
+                        <p>Utiliza el panel lateral para navegar entre las diferentes secciones del sistema.</p>
+                    </div>
+                    <div class="features-grid">
+                        <div class="feature-card">
+                            <i class="fas fa-id-card"></i>
+                            <h4>Registro RFID</h4>
+                            <p>Registro automático de asistencia mediante tarjetas RFID.</p>
+                        </div>
+                        <div class="feature-card">
+                            <i class="fas fa-chart-bar"></i>
+                            <h4>Reportes</h4>
+                            <p>Generación de reportes de asistencia en tiempo real.</p>
+                        </div>
+                        <div class="feature-card">
+                            <i class="fas fa-user-check"></i>
+                            <h4>Control de Acceso</h4>
+                            <p>Control de acceso a eventos y áreas específicas.</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ==================== SECCIÓN PERSONAS ==================== -->
+            <section id="personas" class="section">
+                <div class="section-header">
+                    <h2>Gestión de Personas</h2>
+                    <p class="subtitle">Administración de alumnos, profesores y personal</p>
+                </div>
+                <div class="section-content">
+                    <div class="action-bar">
+                        <div class="action-group">
+                            <button class="btn btn-primary" id="btnNuevaPersona">
+                                <i class="fas fa-user-plus"></i> Nueva Persona
+                            </button>
+                            <div class="filter-tabs">
+                                <button class="filter-tab active" data-filter="todos">Todos</button>
+                                <button class="filter-tab" data-filter="alumno">Alumnos</button>
+                                <button class="filter-tab" data-filter="profesor">Profesores</button>
+                                <button class="filter-tab" data-filter="preceptor">Preceptores</button>
+                            </div>
+                        </div>
+                        <div class="search-box">
+                            <input type="text" id="searchPersonas" placeholder="Buscar persona...">
+                            <i class="fas fa-search"></i>
+                        </div>
+                    </div>
+                    <div class="table-container">
+                        <table class="data-table" id="personasTable_personas">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Nombre</th>
+                                    <th>Apellido</th>
+                                    <th>Rol</th>
+                                    <th>Curso/Área</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="personasTableBody_personas"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ==================== SECCIÓN CURSOS ==================== -->
+            <section id="cursos" class="section">
+                <div class="section-header">
+                    <h2>Gestión de Cursos</h2>
+                    <p class="subtitle">Administración de cursos y divisiones</p>
+                </div>
+                <div class="section-content">
+                    <div class="action-bar">
+                        <div class="action-group">
+                            <button class="btn btn-primary" id="btnNuevoCurso">
+                                <i class="fas fa-plus"></i> Nuevo Curso
+                            </button>
+                            <div class="filter-tabs">
+                                <button class="filter-tab active" data-filter="todos">Todos</button>
+                                <button class="filter-tab" data-filter="1">1° Año</button>
+                                <button class="filter-tab" data-filter="2">2° Año</button>
+                                <button class="filter-tab" data-filter="3">3° Año</button>
+                                <button class="filter-tab" data-filter="4">4° Año</button>
+                                <button class="filter-tab" data-filter="5">5° Año</button>
+                                <button class="filter-tab" data-filter="6">6° Año</button>
+                                <button class="filter-tab" data-filter="7">7° Año</button>
+                            </div>
+                        </div>
+                        <div class="search-box">
+                            <input type="text" id="searchCursos" placeholder="Buscar curso...">
+                            <i class="fas fa-search"></i>
+                        </div>
+                    </div>
+                    <div class="table-container">
+                        <table class="data-table" id="cursosTable">
+                            <thead>
+                                <tr>
+                                    <th>Año</th>
+                                    <th>División</th>
+                                    <th>Cantidad de Alumnos</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="cursosTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ==================== SECCIÓN ASISTENCIAS ==================== -->
+            <section id="asistencias" class="section">
+                <div class="section-header">
+                    <h2>Gestión de Asistencias</h2>
+                    <p class="subtitle">Administra alumnos, profesores y personal con RFID</p>
+                </div>
+                <div class="section-content">
+                    <div class="action-bar">
+                        <div class="action-group">
+                            <button class="btn btn-primary" id="nuevaPersonaBtn">
+                                <i class="fas fa-plus"></i> Nueva Persona
+                            </button>
+                            <div class="filter-tabs">
+                                <button class="filter-tab active" data-filter="todos">Todos</button>
+                                <button class="filter-tab" data-filter="alumno">Alumnos</button>
+                                <button class="filter-tab" data-filter="profesor">Profesores</button>
+                                <button class="filter-tab" data-filter="preceptor">Preceptores</button>
+                                <button class="filter-tab" data-filter="directivo">Directivos</button>
+                            </div>
+                        </div>
+                        <div class="search-box">
+                            <input type="text" id="searchInput" placeholder="Buscar por nombre, ID o curso...">
+                            <i class="fas fa-search"></i>
+                        </div>
+                    </div>
+                    
+                    <div class="stats-bar">
+                        <div class="stat-card">
+                            <i class="fas fa-users"></i>
+                            <div class="stat-info">
+                                <span class="stat-number" id="totalPersonas">0</span>
+                                <span class="stat-label">Total</span>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <i class="fas fa-graduation-cap"></i>
+                            <div class="stat-info">
+                                <span class="stat-number" id="totalAlumnos">0</span>
+                                <span class="stat-label">Alumnos</span>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <i class="fas fa-chalkboard-teacher"></i>
+                            <div class="stat-info">
+                                <span class="stat-number" id="totalProfesores">0</span>
+                                <span class="stat-label">Profesores</span>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <i class="fas fa-user-check"></i>
+                            <div class="stat-info">
+                                <span class="stat-number" id="totalActivos">0</span>
+                                <span class="stat-label">Presentes</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="table-container">
+                        <table class="data-table" id="personasTable_asistencias">
+                            <thead>
+                                <tr>
+                                    <th>ID Tarjeta</th>
+                                    <th>Nombre</th>
+                                    <th>Apellido</th>
+                                    <th>Rol</th>
+                                    <th>Detalle</th>
+                                    <th>Estado</th>
+                                    <th>Fecha Registro</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="personasTableBody_asistencias"></tbody>
+                        </table>
+                    </div>
+                    
+                    <div class="table-footer">
+                        <div class="table-info">
+                            Mostrando <span id="personasCount">0</span> de <span id="totalCount">0</span> registros
+                        </div>
+                        <div class="pagination">
+                            <button class="btn-pagination" id="prevPage" disabled>
+                                <i class="fas fa-chevron-left"></i>
+                            </button>
+                            <span class="page-info">Página <span id="currentPage">1</span></span>
+                            <button class="btn-pagination" id="nextPage" disabled>
+                                <i class="fas fa-chevron-right"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ==================== SECCIÓN ESTADÍSTICAS ==================== -->
+            <section id="estadisticas" class="section">
+                <div class="section-header">
+                    <h2>Panel de Estadísticas</h2>
+                    <p class="subtitle">Análisis detallado del sistema - Acceso exclusivo para directivos</p>
+                </div>
+                <div class="section-content">
+                    <div class="stats-detailed-grid">
+                        <div class="stat-circle-container">
+                            <div class="stat-circle">
+                                <svg class="circle-chart" viewBox="0 0 36 36" width="180" height="180">
+                                    <path class="circle-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                                    <path class="circle-alumnos" stroke-dasharray="0, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                                    <text x="18" y="20.5" class="percentage">0%</text>
+                                </svg>
+                            </div>
+                            <h4>Alumnos</h4>
+                            <p class="stat-count" id="statAlumnosDetallado">0</p>
+                        </div>
+                        <div class="stat-circle-container">
+                            <div class="stat-circle">
+                                <svg class="circle-chart" viewBox="0 0 36 36" width="180" height="180">
+                                    <path class="circle-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                                    <path class="circle-profesores" stroke-dasharray="0, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                                    <text x="18" y="20.5" class="percentage">0%</text>
+                                </svg>
+                            </div>
+                            <h4>Profesores</h4>
+                            <p class="stat-count" id="statProfesoresDetallado">0</p>
+                        </div>
+                        <div class="stat-circle-container">
+                            <div class="stat-circle">
+                                <svg class="circle-chart" viewBox="0 0 36 36" width="180" height="180">
+                                    <path class="circle-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                                    <path class="circle-preceptores" stroke-dasharray="0, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                                    <text x="18" y="20.5" class="percentage">0%</text>
+                                </svg>
+                            </div>
+                            <h4>Preceptores</h4>
+                            <p class="stat-count" id="statPreceptoresDetallado">0</p>
+                        </div>
+                        <div class="stat-circle-container">
+                            <div class="stat-circle">
+                                <svg class="circle-chart" viewBox="0 0 36 36" width="180" height="180">
+                                    <path class="circle-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                                    <path class="circle-directivos" stroke-dasharray="0, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                                    <text x="18" y="20.5" class="percentage">0%</text>
+                                </svg>
+                            </div>
+                            <h4>Directivos</h4>
+                            <p class="stat-count" id="statDirectivosDetallado">0</p>
+                        </div>
+                    </div>
+
+                    <div class="stats-summary-detailed">
+                        <h3><i class="fas fa-chart-line"></i> Resumen General del Sistema</h3>
+                        <div class="summary-detailed-grid">
+                            <div class="summary-detailed-item">
+                                <div class="summary-icon"><i class="fas fa-users"></i></div>
+                                <div class="summary-content">
+                                    <span class="summary-label">Total Personas Registradas</span>
+                                    <span class="summary-value" id="totalPersonasDetallado">0</span>
+                                </div>
+                            </div>
+                            <div class="summary-detailed-item">
+                                <div class="summary-icon"><i class="fas fa-user-check"></i></div>
+                                <div class="summary-content">
+                                    <span class="summary-label">Personas Presentes Hoy</span>
+                                    <span class="summary-value" id="totalPresentesDetallado">0</span>
+                                </div>
+                            </div>
+                            <div class="summary-detailed-item">
+                                <div class="summary-icon"><i class="fas fa-user-times"></i></div>
+                                <div class="summary-content">
+                                    <span class="summary-label">Personas Ausentes</span>
+                                    <span class="summary-value" id="totalAusentesDetallado">0</span>
+                                </div>
+                            </div>
+                            <div class="summary-detailed-item">
+                                <div class="summary-icon"><i class="fas fa-id-card"></i></div>
+                                <div class="summary-content">
+                                    <span class="summary-label">Tarjetas RFID Asignadas</span>
+                                    <span class="summary-value" id="totalTarjetasAsignadas">0</span>
+                                </div>
+                            </div>
+                            <div class="summary-detailed-item">
+                                <div class="summary-icon"><i class="fas fa-graduation-cap"></i></div>
+                                <div class="summary-content">
+                                    <span class="summary-label">Total Cursos Activos</span>
+                                    <span class="summary-value" id="totalCursosActivos">0</span>
+                                </div>
+                            </div>
+                            <div class="summary-detailed-item">
+                                <div class="summary-icon"><i class="fas fa-chalkboard-teacher"></i></div>
+                                <div class="summary-content">
+                                    <span class="summary-label">Promedio Alumnos por Curso</span>
+                                    <span class="summary-value" id="promedioAlumnosPorCurso">0</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="stats-table-container">
+                        <h3><i class="fas fa-chart-bar"></i> Asistencia por Curso</h3>
+                        <div class="table-container">
+                            <table class="data-table" id="asistenciaPorCursoTable">
+                                <thead>
+                                    <tr>
+                                        <th>Curso</th>
+                                        <th>Total Alumnos</th>
+                                        <th>Presentes</th>
+                                        <th>Ausentes</th>
+                                        <th>Porcentaje Asistencia</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="asistenciaPorCursoBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="stats-actions">
+                        <button class="btn btn-primary" id="btnExportarEstadisticas">
+                            <i class="fas fa-file-excel"></i> Exportar Estadísticas a Excel
+                        </button>
+                        <button class="btn btn-secondary" id="btnImprimirEstadisticas">
+                            <i class="fas fa-print"></i> Imprimir Reporte
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ==================== SECCIÓN ADMINISTRACIÓN ==================== -->
+            <section id="administracion" class="section">
+                <div class="section-header">
+                    <h2>Panel de Administración</h2>
+                    <p class="subtitle">Configuración del sistema</p>
+                </div>
+                <div class="section-content">
+                    <div class="admin-cards">
+                        <div class="admin-card">
+                            <i class="fas fa-file-excel"></i>
+                            <h4>Exportar Datos</h4>
+                            <p>Exporta la tabla de asistencia a Excel automáticamente.</p>
+                            <button class="btn btn-secondary" id="btnExportar">Exportar a Excel</button>
+                        </div>
+                        <div class="admin-card">
+                            <i class="fas fa-users-cog"></i>
+                            <h4>Gestión de Usuarios</h4>
+                            <p>Crear y administrar usuarios del sistema junto a los permisos.</p>
+                            <button class="btn btn-secondary" id="btnGestionUsuarios">Gestionar</button>
+                        </div>
+                        <div class="admin-card">
+                            <i class="fas fa-cog"></i>
+                            <h4>Configuración</h4>
+                            <p>Personaliza la configuración del sistema y sus opciones.</p>
+                            <button class="btn btn-secondary" id="btnConfiguracion">Configurar</button>
+                        </div>
+                        <div class="admin-card">
+                            <i class="fas fa-door-open"></i>
+                            <h4>Cerrar Sesión</h4>
+                            <p>Cerrar la sesión actual del administrador con permisos.</p>
+                            <button class="btn btn-secondary" id="btnCerrarSesion">Cerrar Sesión</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ==================== MODALES PRINCIPALES ==================== -->
+
+            <!-- Modal de notificación (para reemplazar alerts) -->
+            <div id="notificationModal" class="modal">
+                <div class="modal-content modal-small">
+                    <div class="modal-header" id="notificationHeader">
+                        <i class="fas fa-info-circle" id="notificationIcon"></i>
+                        <h3 id="notificationTitle">Notificación</h3>
+                        <button class="close-modal">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <p id="notificationMessage"></p>
+                    </div>
+                    <div class="modal-actions">
+                        <button class="btn btn-primary" id="notificationCloseBtn">Aceptar</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal de confirmación (para reemplazar confirm) -->
+            <div id="confirmModal" class="modal">
+                <div class="modal-content modal-small">
+                    <div class="modal-header">
+                        <i class="fas fa-question-circle"></i>
+                        <h3>Confirmar acción</h3>
+                        <button class="close-modal">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <p id="confirmMessage"></p>
+                    </div>
+                    <div class="modal-actions">
+                        <button class="btn btn-cancel" id="confirmCancelBtn">Cancelar</button>
+                        <button class="btn btn-primary" id="confirmOkBtn">Aceptar</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal de carga/progreso -->
+            <div id="loadingModal" class="modal">
+                <div class="modal-content modal-small">
+                    <div class="modal-body" style="text-align: center;">
+                        <i class="fas fa-spinner fa-pulse" style="font-size: 3rem; color: var(--primary-color);"></i>
+                        <p id="loadingMessage" style="margin-top: 1rem;">Procesando...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal para nueva persona -->
+            <div id="nuevoAlumnoModal" class="modal">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3>Nuevo Registro</h3>
+                        <button class="close-modal">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="formNuevoAlumno">
+                            <div class="photo-upload-container">
+                                <div class="photo-placeholder">
+                                    <i class="fas fa-user"></i>
+                                    <span>Imagen no disponible</span>
+                                </div>
+                            </div>
+                            
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="nombre"><i class="fas fa-user"></i> Nombre</label>
+                                    <input type="text" id="nombre" name="nombre" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="apellido"><i class="fas fa-user-tag"></i> Apellido</label>
+                                    <input type="text" id="apellido" name="apellido" required>
+                                </div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label><i class="fas fa-id-card"></i> Código de Tarjeta RFID</label>
+                                <div class="rfid-section">
+                                    <button type="button" id="connectBtn" class="btn btn-rfid">
+                                        <i class="fas fa-plug"></i> Conectar RFID
+                                    </button>
+                                    <input type="text" id="tarjetaIdManual" name="tarjeta_id_manual" 
+                                           placeholder="O ingresa el código manualmente" class="rfid-manual-input">
+                                    <div class="message-box" id="rfidMessage">
+                                        <i class="fas fa-rss"></i>
+                                        <span>Escanear Tarjeta...</span>
+                                    </div>
+                                </div>
+                                <input type="hidden" id="tarjetaId" name="tarjeta_id">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="rol"><i class="fas fa-user-cog"></i> Rol</label>
+                                <div class="custom-dropdown">
+                                    <select id="rol" name="rol" required>
+                                        <option value="">Seleccionar rol</option>
+                                        <option value="alumno">Alumno</option>
+                                        <option value="profesor">Profesor</option>
+                                        <option value="preceptor">Preceptor</option>
+                                        <option value="directivo">Directivo</option>
+                                    </select>
+                                    <i class="fas fa-chevron-down dropdown-arrow"></i>
+                                </div>
+                            </div>
+                            
+                            <div id="campoDinamico" class="form-group hidden">
+                                <label id="labelDinamico"></label>
+                                <div id="inputDinamicoContainer"></div>
+                            </div>
+                            
+                            <div class="modal-actions">
+                                <button type="button" class="btn btn-cancel">Cancelar</button>
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-save"></i> Guardar
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal de Gestión de Usuarios -->
+            <div id="gestionUsuariosModal" class="modal">
+                <div class="modal-content modal-large">
+                    <div class="modal-header">
+                        <h3>Gestión de Usuarios</h3>
+                        <button class="close-modal">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="action-bar">
+                            <button class="btn btn-primary" id="btnNuevoUsuario">
+                                <i class="fas fa-plus"></i> Nuevo Usuario
+                            </button>
+                        </div>
+                        <div class="table-container">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Usuario</th>
+                                        <th>Cargo</th>
+                                        <th>Estado</th>
+                                        <th>Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="usuariosTableBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal de Nuevo Usuario -->
+            <div id="nuevoUsuarioModal" class="modal">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3>Nuevo Usuario</h3>
+                        <button class="close-modal">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="formNuevoUsuario">
+                            <div class="form-group">
+                                <label for="usuario"><i class="fas fa-user"></i> Usuario</label>
+                                <input type="text" id="usuario" name="usuario" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="contrasena"><i class="fas fa-lock"></i> Contraseña</label>
+                                <input type="password" id="contrasena" name="contrasena" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="cargoUsuario"><i class="fas fa-user-tag"></i> Cargo</label>
+                                <div class="custom-dropdown">
+                                    <select id="cargoUsuario" name="cargo" required>
+                                        <option value="">Seleccionar cargo</option>
+                                        <option value="directivo">Directivo</option>
+                                        <option value="profesor">Profesor</option>
+                                        <option value="preceptor">Preceptor</option>
+                                    </select>
+                                    <i class="fas fa-chevron-down dropdown-arrow"></i>
+                                </div>
+                            </div>
+                            <div class="permisos-info">
+                                <h4>Permisos por Cargo:</h4>
+                                <ul>
+                                    <li><strong>Directivo:</strong> Acceso completo (ver estadísticas, editar, eliminar)</li>
+                                    <li><strong>Profesor:</strong> Solo ver asistencias (sin editar)</li>
+                                    <li><strong>Preceptor:</strong> Solo ver asistencias (sin editar)</li>
+                                </ul>
+                            </div>
+                            <div class="modal-actions">
+                                <button type="button" class="btn btn-cancel">Cancelar</button>
+                                <button type="submit" class="btn btn-primary">Guardar Usuario</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal de Configuración -->
+            <div id="configuracionModal" class="modal">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3>Configuración del Sistema</h3>
+                        <button class="close-modal">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="formConfiguracion">
+                            <div class="form-group">
+                                <label for="configTema"><i class="fas fa-palette"></i> Tema</label>
+                                <div class="custom-dropdown">
+                                    <select id="configTema" name="tema">
+                                        <option value="default">Por defecto</option>
+                                        <option value="dark">Oscuro</option>
+                                        <option value="light">Claro</option>
+                                    </select>
+                                    <i class="fas fa-chevron-down dropdown-arrow"></i>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>
+                                    <i class="fas fa-save"></i> Auto-guardado
+                                    <input type="checkbox" id="configAutoSave" name="autoSave">
+                                </label>
+                            </div>
+                            <div class="modal-actions">
+                                <button type="button" class="btn btn-cancel">Cancelar</button>
+                                <button type="submit" class="btn btn-primary">Guardar Cambios</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal de Nuevo Curso -->
+            <div id="nuevoCursoModal" class="modal">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3>Nuevo Curso</h3>
+                        <button class="close-modal">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="formNuevoCurso">
+                            <div class="form-group">
+                                <label for="anio"><i class="fas fa-sort-numeric-up"></i> Año</label>
+                                <div class="custom-dropdown">
+                                    <select id="anio" name="anio" required>
+                                        <option value="">Seleccionar año</option>
+                                        <option value="1">1° Año</option>
+                                        <option value="2">2° Año</option>
+                                        <option value="3">3° Año</option>
+                                        <option value="4">4° Año</option>
+                                        <option value="5">5° Año</option>
+                                        <option value="6">6° Año</option>
+                                        <option value="7">7° Año</option>
+                                    </select>
+                                    <i class="fas fa-chevron-down dropdown-arrow"></i>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="division"><i class="fas fa-tag"></i> División</label>
+                                <div class="custom-dropdown">
+                                    <select id="division" name="division" required>
+                                        <option value="">Seleccionar división</option>
+                                        <option value="1">1ra División</option>
+                                        <option value="2">2da División</option>
+                                        <option value="3">3ra División</option>
+                                        <option value="4">4ta División</option>
+                                        <option value="5">5ta División</option>
+                                        <option value="6">6ta División</option>
+                                        <option value="7">7ma División</option>
+                                        <option value="8">8va División</option>
+                                    </select>
+                                    <i class="fas fa-chevron-down dropdown-arrow"></i>
+                                </div>
+                            </div>
+                            <div class="modal-actions">
+                                <button type="button" class="btn btn-cancel close-modal">Cancelar</button>
+                                <button type="submit" class="btn btn-primary">Crear Curso</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal de Alumnos del Curso -->
+            <div id="alumnosCursoModal" class="modal">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <div class="modal-title-group">
+                            <h3>Alumnos del Curso <span id="cursoTitulo"></span></h3>
+                        </div>
+                        <button class="close-modal">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="table-container">
+                            <table class="data-table" id="alumnosCursoTable">
+                                <thead>
+                                    <tr>
+                                        <th>Nombre</th>
+                                        <th>Apellido</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="alumnosCursoTableBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-primary close-modal">Cerrar</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal de Login Administrativo -->
+            <div id="loginAdminModal" class="modal">
+                <div class="modal-content modal-small">
+                    <div class="modal-header">
+                        <h3>Acceso Administrativo</h3>
+                        <button class="close-modal">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="formLoginAdmin">
+                            <div class="form-group">
+                                <label for="adminUsuario"><i class="fas fa-user"></i> Usuario</label>
+                                <input type="text" id="adminUsuario" name="usuario" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="adminContrasena"><i class="fas fa-lock"></i> Contraseña</label>
+                                <input type="password" id="adminContrasena" name="contrasena" required>
+                            </div>
+                            <div class="modal-actions">
+                                <button type="button" class="btn btn-cancel">Cancelar</button>
+                                <button type="submit" class="btn btn-primary">Acceder</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="js/scripts.js"></script>
+</body>
+</html>
