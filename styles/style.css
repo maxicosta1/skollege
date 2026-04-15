@@ -1236,3 +1236,293 @@ body {
         opacity: 1;
     }
 }
+
+.logo{
+    width: 40px;
+    height: 40px;
+    background: url('../assets/logo.png') no-repeat center center;
+    background-size: contain;
+}
+
+.sidebar-profile {
+    gap: 1rem;
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+
+}
+
+/* ================================================
+   ESTILOS PARA FOTOS DE PERFIL Y FICHAS DE ALUMNOS
+   ================================================ */
+
+/* Foto en el sidebar */
+.user-profile-sidebar {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.5rem;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    margin-bottom: 0.5rem;
+}
+
+.user-avatar-sidebar {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+
+.user-avatar-sidebar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.user-avatar-sidebar i {
+    font-size: 2.5rem;
+    color: white;
+}
+
+.user-info-sidebar {
+    flex: 1;
+}
+
+.user-name-sidebar {
+    display: block;
+    font-weight: bold;
+    font-size: 0.9rem;
+    color: white;
+}
+
+.user-role-sidebar {
+    display: block;
+    font-size: 0.7rem;
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.user-course-sidebar {
+    display: block;
+    font-size: 0.7rem;
+    color: rgba(255, 255, 255, 0.5);
+}
+
+/* Foto en el header */
+.user-info {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    margin-left: auto;
+    background: var(--primary-color);
+    padding: 0.3rem 0.8rem 0.3rem 0.3rem;
+    border-radius: 40px;
+    color: white;
+}
+
+.user-avatar-header {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+
+.user-avatar-header img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.user-avatar-header i {
+    font-size: 1.8rem;
+}
+
+.user-details-header {
+    display: flex;
+    flex-direction: column;
+}
+
+.user-details-header #userName {
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.user-role-header {
+    font-size: 0.7rem;
+    opacity: 0.8;
+}
+
+/* Contenedor de carga de foto */
+.photo-upload-container {
+    text-align: center;
+    margin-bottom: 1.5rem;
+    padding: 1rem;
+    background: var(--light-color);
+    border-radius: 10px;
+}
+
+.photo-preview {
+    width: 120px;
+    height: 120px;
+    margin: 0 auto 1rem;
+    border-radius: 50%;
+    overflow: hidden;
+    background: #f0f0f0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 3px solid var(--primary-color);
+}
+
+.photo-preview img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.photo-upload-controls {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: center;
+    margin-bottom: 0.5rem;
+}
+
+.btn-sm {
+    padding: 0.4rem 0.8rem;
+    font-size: 0.8rem;
+}
+
+.photo-hint {
+    font-size: 0.7rem;
+    color: #6c757d;
+    margin: 0;
+}
+
+/* Tabla con fotos */
+.data-table td .user-thumb {
+    width: 35px;
+    height: 35px;
+    border-radius: 50%;
+    object-fit: cover;
+    background: #f0f0f0;
+}
+
+/* Ficha del alumno */
+.ficha-container {
+    display: flex;
+    gap: 2rem;
+    padding: 1rem;
+}
+
+.ficha-foto {
+    width: 200px;
+    height: 200px;
+    border-radius: 15px;
+    overflow: hidden;
+    background: #f0f0f0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 3px solid var(--primary-color);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+}
+
+.ficha-foto img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.ficha-datos {
+    flex: 1;
+}
+
+.ficha-datos h4 {
+    font-size: 1.5rem;
+    color: var(--secondary-color);
+    margin-bottom: 1.5rem;
+    border-bottom: 2px solid var(--primary-color);
+    padding-bottom: 0.5rem;
+}
+
+.ficha-info-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.ficha-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+}
+
+.ficha-item label {
+    font-weight: 600;
+    color: var(--primary-color);
+    font-size: 0.8rem;
+}
+
+.ficha-item span {
+    font-size: 1rem;
+    color: var(--text-color);
+}
+
+.ficha-actions {
+    display: flex;
+    gap: 0.8rem;
+    margin-top: 1rem;
+    flex-wrap: wrap;
+}
+
+/* Responsive para ficha */
+@media (max-width: 768px) {
+    .ficha-container {
+        flex-direction: column;
+        align-items: center;
+    }
+    
+    .ficha-foto {
+        width: 150px;
+        height: 150px;
+    }
+    
+    .ficha-info-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .ficha-actions {
+        justify-content: center;
+    }
+}
+
+/* Foto en tabla de alumnos del curso */
+.alumno-thumb {
+    width: 35px;
+    height: 35px;
+    border-radius: 50%;
+    object-fit: cover;
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+
+.alumno-thumb:hover {
+    transform: scale(1.1);
+}
+
+/* Estilo para filas clickeables */
+.clickable-row {
+    cursor: pointer;
+}
+
+.clickable-row:hover {
+    background: var(--light-color) !important;
+}

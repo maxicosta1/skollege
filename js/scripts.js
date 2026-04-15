@@ -1,11 +1,16 @@
 /**
  * ============================================================================
- * SISTEMA DE GESTIÓN ESCOLAR CON RFID - MODALES DE NOTIFICACIÓN
+ * SISTEMA DE GESTIÓN ESCOLAR CON RFID - VERSIÓN COMPLETA
  * ============================================================================
  * 
- * Se han reemplazado todos los alerts() por modales personalizados
+ * Características:
+ * - Foto de perfil en sidebar y header
+ * - Carga de imágenes al registrar personas
+ * - Ficha de alumno accesible desde cursos y personas
+ * - Modales de notificación personalizados
+ * - Control de permisos por rol
  * 
- * @version 2.0
+ * @version 3.0
  * @author Sistema Expotec 2026
  * ============================================================================
  */
@@ -19,7 +24,9 @@ let listaUsuarios = [];
 let listaCursos = [];
 let usuarioActual = null;
 let filtroActual = 'todos';
-let confirmCallback = null;  // Callback para la confirmación modal
+let confirmCallback = null;
+let fotoSeleccionada = null;
+let personaActualFicha = null;
 
 let configuracionSistema = {
     tema: 'default',
@@ -28,12 +35,6 @@ let configuracionSistema = {
 
 // ==================== FUNCIONES DE MODALES DE NOTIFICACIÓN ====================
 
-/**
- * Muestra un modal de notificación en lugar de alert()
- * @param {string} mensaje - Mensaje a mostrar
- * @param {string} tipo - Tipo de notificación: 'success', 'error', 'warning', 'info'
- * @param {string} titulo - Título del modal (opcional)
- */
 function mostrarNotificacion(mensaje, tipo = 'info', titulo = null) {
     const modal = document.getElementById('notificationModal');
     const header = document.getElementById('notificationHeader');
@@ -41,7 +42,6 @@ function mostrarNotificacion(mensaje, tipo = 'info', titulo = null) {
     const titleEl = document.getElementById('notificationTitle');
     const messageEl = document.getElementById('notificationMessage');
     
-    // Configurar icono y color según tipo
     let icono = 'fa-info-circle';
     let claseTipo = 'notification-info';
     let tituloPorDefecto = 'Notificación';
@@ -70,17 +70,14 @@ function mostrarNotificacion(mensaje, tipo = 'info', titulo = null) {
             break;
     }
     
-    // Aplicar estilos
     icon.className = `fas ${icono}`;
     modal.classList.add(claseTipo);
     titleEl.textContent = titulo || tituloPorDefecto;
     messageEl.textContent = mensaje;
     
-    // Mostrar modal
     modal.classList.add('active');
     document.body.style.overflow = 'hidden';
     
-    // Configurar cierre
     const closeBtn = document.getElementById('notificationCloseBtn');
     const closeModalBtn = modal.querySelector('.close-modal');
     
@@ -95,7 +92,6 @@ function mostrarNotificacion(mensaje, tipo = 'info', titulo = null) {
     closeBtn.addEventListener('click', cerrarNotificacion);
     if (closeModalBtn) closeModalBtn.addEventListener('click', cerrarNotificacion);
     
-    // Cerrar al hacer clic fuera
     modal.addEventListener('click', function(e) {
         if (e.target === modal) {
             cerrarNotificacion();
@@ -103,12 +99,6 @@ function mostrarNotificacion(mensaje, tipo = 'info', titulo = null) {
     });
 }
 
-/**
- * Muestra un modal de confirmación en lugar de confirm()
- * @param {string} mensaje - Mensaje de confirmación
- * @param {function} callbackOk - Función a ejecutar si confirma
- * @param {function} callbackCancel - Función a ejecutar si cancela (opcional)
- */
 function mostrarConfirmacion(mensaje, callbackOk, callbackCancel = null) {
     const modal = document.getElementById('confirmModal');
     const messageEl = document.getElementById('confirmMessage');
@@ -141,7 +131,6 @@ function mostrarConfirmacion(mensaje, callbackOk, callbackCancel = null) {
     cancelBtn.addEventListener('click', handleCancel);
     if (closeModalBtn) closeModalBtn.addEventListener('click', handleCancel);
     
-    // Cerrar al hacer clic fuera
     modal.addEventListener('click', function(e) {
         if (e.target === modal) {
             handleCancel();
@@ -152,10 +141,6 @@ function mostrarConfirmacion(mensaje, callbackOk, callbackCancel = null) {
     document.body.style.overflow = 'hidden';
 }
 
-/**
- * Muestra un modal de carga
- * @param {string} mensaje - Mensaje a mostrar durante la carga
- */
 function mostrarCarga(mensaje = 'Procesando...') {
     const modal = document.getElementById('loadingModal');
     const messageEl = document.getElementById('loadingMessage');
@@ -164,13 +149,128 @@ function mostrarCarga(mensaje = 'Procesando...') {
     document.body.style.overflow = 'hidden';
 }
 
-/**
- * Oculta el modal de carga
- */
 function ocultarCarga() {
     const modal = document.getElementById('loadingModal');
     modal.classList.remove('active');
     document.body.style.overflow = 'auto';
+}
+
+// ==================== FUNCIONES DE FOTO DE PERFIL ====================
+
+function convertirImagenABase64(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+    });
+}
+
+async function manejarSeleccionFoto(file) {
+    if (!file) return;
+    
+    if (file.size > 2 * 1024 * 1024) {
+        mostrarNotificacion('La imagen es demasiado grande. Tamaño máximo: 2MB', 'warning');
+        return;
+    }
+    
+    const tiposPermitidos = ['image/jpeg', 'image/png', 'image/gif', 'image/jpg'];
+    if (!tiposPermitidos.includes(file.type)) {
+        mostrarNotificacion('Formato no soportado. Use JPG, PNG o GIF', 'warning');
+        return;
+    }
+    
+    mostrarCarga('Procesando imagen...');
+    try {
+        const base64 = await convertirImagenABase64(file);
+        fotoSeleccionada = base64;
+        const previewImg = document.getElementById('previewImage');
+        if (previewImg) previewImg.src = base64;
+        document.getElementById('btnEliminarFoto').style.display = 'inline-flex';
+        ocultarCarga();
+    } catch (error) {
+        ocultarCarga();
+        mostrarNotificacion('Error al procesar la imagen', 'error');
+    }
+}
+
+function eliminarFotoSeleccionada() {
+    fotoSeleccionada = null;
+    const previewImg = document.getElementById('previewImage');
+    if (previewImg) {
+        previewImg.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23bdc3c7'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E";
+    }
+    document.getElementById('btnEliminarFoto').style.display = 'none';
+    mostrarNotificacion('Foto eliminada', 'info');
+}
+
+// ==================== FUNCIONES DE FICHA DEL ALUMNO ====================
+
+function mostrarFichaAlumno(personaId) {
+    const persona = listaPersonas.find(p => p.tarjeta_id === personaId || p.id === personaId);
+    if (!persona) return;
+    
+    personaActualFicha = persona;
+    
+    document.getElementById('fichaNombreCompleto').textContent = `${persona.nombre} ${persona.apellido}`;
+    document.getElementById('fichaDNI').textContent = persona.dni || '-';
+    document.getElementById('fichaRol').textContent = persona.rol;
+    document.getElementById('fichaRol').className = `rol-badge ${persona.rol}`;
+    document.getElementById('fichaDetalle').textContent = persona.detalle || '-';
+    document.getElementById('fichaTarjetaId').textContent = persona.tarjeta_id || 'No asignado';
+    document.getElementById('fichaEstado').textContent = persona.estado || 'Presente';
+    document.getElementById('fichaEstado').className = `status ${(persona.estado || 'Presente') === 'Presente' ? 'active' : 'inactive'}`;
+    document.getElementById('fichaFechaRegistro').textContent = persona.fecha_registro ? new Date(persona.fecha_registro).toLocaleDateString() : '-';
+    
+    const fotoImg = document.getElementById('fichaFoto');
+    if (persona.foto) {
+        fotoImg.src = persona.foto;
+    } else {
+        fotoImg.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23bdc3c7'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E";
+    }
+    
+    mostrarModal('fichaAlumnoModal');
+}
+
+function cambiarEstadoFicha() {
+    if (!personaActualFicha) return;
+    
+    const nuevoEstado = personaActualFicha.estado === 'Presente' ? 'Ausente' : 'Presente';
+    mostrarConfirmacion(`¿Cambiar estado de ${personaActualFicha.nombre} ${personaActualFicha.apellido} a "${nuevoEstado}"?`, () => {
+        personaActualFicha.estado = nuevoEstado;
+        guardarPersonas();
+        cargarTablaPersonasPrincipal();
+        cargarTablaPersonasSimplificada();
+        actualizarEstadisticasRapidas();
+        if (usuarioActual && usuarioActual.cargo === 'directivo') {
+            cargarEstadisticasDetalladas();
+        }
+        mostrarFichaAlumno(personaActualFicha.tarjeta_id);
+        mostrarNotificacion(`Estado cambiado a ${nuevoEstado}`, 'success');
+    });
+}
+
+function editarFicha() {
+    if (!personaActualFicha) return;
+    cerrarModal('fichaAlumnoModal');
+    // Aquí se podría abrir un modal de edición
+    mostrarNotificacion('Funcionalidad de edición en desarrollo', 'info');
+}
+
+function eliminarFicha() {
+    if (!personaActualFicha) return;
+    mostrarConfirmacion(`¿Eliminar permanentemente a ${personaActualFicha.nombre} ${personaActualFicha.apellido}?`, () => {
+        listaPersonas = listaPersonas.filter(p => p.tarjeta_id !== personaActualFicha.tarjeta_id);
+        guardarPersonas();
+        cargarTablaPersonasPrincipal();
+        cargarTablaPersonasSimplificada();
+        actualizarEstadisticasRapidas();
+        if (usuarioActual && usuarioActual.cargo === 'directivo') {
+            cargarEstadisticasDetalladas();
+        }
+        cerrarModal('fichaAlumnoModal');
+        mostrarNotificacion('Persona eliminada correctamente', 'success');
+    });
 }
 
 // ==================== FUNCIONES DE INICIALIZACIÓN ====================
@@ -185,37 +285,45 @@ function cargarDatosIniciales() {
                 tarjeta_id: 'A1B2C3D4', 
                 nombre: 'Ana', 
                 apellido: 'García', 
+                dni: '12345678',
                 rol: 'alumno', 
                 detalle: '4° A',
                 estado: 'Presente',
-                fecha_registro: new Date().toISOString()
+                fecha_registro: new Date().toISOString(),
+                foto: null
             },
             { 
                 tarjeta_id: 'E5F6G7H8', 
                 nombre: 'Carlos', 
                 apellido: 'López', 
+                dni: '87654321',
                 rol: 'profesor', 
                 detalle: 'Matemáticas',
                 estado: 'Presente',
-                fecha_registro: new Date().toISOString()
+                fecha_registro: new Date().toISOString(),
+                foto: null
             },
             { 
                 tarjeta_id: 'I9J0K1L2', 
                 nombre: 'María', 
                 apellido: 'Rodríguez', 
+                dni: '11223344',
                 rol: 'alumno', 
                 detalle: '3° C',
                 estado: 'Ausente',
-                fecha_registro: new Date().toISOString()
+                fecha_registro: new Date().toISOString(),
+                foto: null
             },
             { 
                 tarjeta_id: 'M3N4O5P6', 
                 nombre: 'Juan', 
                 apellido: 'Pérez', 
+                dni: '44332211',
                 rol: 'directivo', 
                 detalle: 'Director',
                 estado: 'Presente',
-                fecha_registro: new Date().toISOString()
+                fecha_registro: new Date().toISOString(),
+                foto: null
             }
         ];
         guardarPersonas();
@@ -231,6 +339,8 @@ function cargarDatosIniciales() {
                 contrasena: '1234',
                 cargo: 'directivo',
                 activo: true,
+                nombre: 'Administrador',
+                foto: null,
                 fechaCreacion: new Date().toISOString()
             },
             {
@@ -238,6 +348,8 @@ function cargarDatosIniciales() {
                 contrasena: '1234',
                 cargo: 'profesor',
                 activo: true,
+                nombre: 'Profesor Demo',
+                foto: null,
                 fechaCreacion: new Date().toISOString()
             }
         ];
@@ -301,21 +413,33 @@ function actualizarVisibilidadPorRol() {
     const navEstadisticas = document.getElementById('navEstadisticas');
     const userInfo = document.getElementById('userInfo');
     const userNameSpan = document.getElementById('userName');
+    const userRoleSpan = document.getElementById('userRole');
+    const sidebarUserName = document.getElementById('sidebarUserName');
+    const sidebarUserRole = document.getElementById('sidebarUserRole');
+    const sidebarUserCourse = document.getElementById('sidebarUserCourse');
+    const userAvatarSidebar = document.getElementById('userAvatarSidebar');
+    const headerAvatar = document.getElementById('headerAvatar');
     
     if (usuarioActual) {
-        if (userInfo) {
-            userInfo.style.display = 'flex';
-            if (userNameSpan) {
-                let displayName = usuarioActual.usuario;
-                if (usuarioActual.cargo === 'directivo') {
-                    displayName = `👑 ${displayName} (Directivo)`;
-                } else if (usuarioActual.cargo === 'profesor') {
-                    displayName = `📚 ${displayName} (Profesor)`;
-                } else {
-                    displayName = `👨‍🏫 ${displayName} (Preceptor)`;
-                }
-                userNameSpan.textContent = displayName;
-            }
+        const usuarioData = listaUsuarios.find(u => u.usuario === usuarioActual.usuario);
+        
+        if (userInfo) userInfo.style.display = 'flex';
+        if (userNameSpan) userNameSpan.textContent = usuarioActual.usuario;
+        if (userRoleSpan) userRoleSpan.textContent = usuarioActual.cargo === 'directivo' ? 'Directivo' : (usuarioActual.cargo === 'profesor' ? 'Profesor' : 'Preceptor');
+        if (sidebarUserName) sidebarUserName.textContent = usuarioData?.nombre || usuarioActual.usuario;
+        if (sidebarUserRole) sidebarUserRole.textContent = usuarioActual.cargo === 'directivo' ? 'Directivo' : (usuarioActual.cargo === 'profesor' ? 'Profesor' : 'Preceptor');
+        if (sidebarUserCourse) sidebarUserCourse.textContent = usuarioData?.detalle || '';
+        
+        if (userAvatarSidebar) {
+            userAvatarSidebar.innerHTML = usuarioData?.foto ? 
+                `<img src="${usuarioData.foto}" alt="Foto">` : 
+                `<i class="fas fa-user-circle"></i>`;
+        }
+        
+        if (headerAvatar) {
+            headerAvatar.innerHTML = usuarioData?.foto ? 
+                `<img src="${usuarioData.foto}" alt="Foto">` : 
+                `<i class="fas fa-user-circle"></i>`;
         }
         
         if (navEstadisticas) {
@@ -346,6 +470,10 @@ function actualizarVisibilidadPorRol() {
     } else {
         if (userInfo) userInfo.style.display = 'none';
         if (navEstadisticas) navEstadisticas.style.display = 'none';
+        if (sidebarUserName) sidebarUserName.textContent = 'Invitado';
+        if (sidebarUserRole) sidebarUserRole.textContent = '';
+        if (sidebarUserCourse) sidebarUserCourse.textContent = '';
+        if (userAvatarSidebar) userAvatarSidebar.innerHTML = '<i class="fas fa-user-circle"></i>';
     }
 }
 
@@ -580,6 +708,14 @@ function inicializarModales() {
             });
         }
     });
+    
+    const btnCambiarEstado = document.getElementById('btnCambiarEstado');
+    const btnEditarFicha = document.getElementById('btnEditarFicha');
+    const btnEliminarFicha = document.getElementById('btnEliminarFicha');
+    
+    if (btnCambiarEstado) btnCambiarEstado.addEventListener('click', cambiarEstadoFicha);
+    if (btnEditarFicha) btnEditarFicha.addEventListener('click', editarFicha);
+    if (btnEliminarFicha) btnEliminarFicha.addEventListener('click', eliminarFicha);
 }
 
 function cerrarModal(modalId) {
@@ -596,6 +732,12 @@ function cerrarModal(modalId) {
         const campoDinamico = document.getElementById('campoDinamico');
         if (campoDinamico) campoDinamico.classList.add('hidden');
         resetearRFID();
+        fotoSeleccionada = null;
+        const previewImg = document.getElementById('previewImage');
+        if (previewImg) {
+            previewImg.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23bdc3c7'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E";
+        }
+        document.getElementById('btnEliminarFoto').style.display = 'none';
     }
 }
 
@@ -695,16 +837,41 @@ function verAlumnosDelCurso(cursoId) {
         
         if (alumnosDelCurso.length === 0) {
             const fila = document.createElement('tr');
-            fila.innerHTML = '<td colspan="2" class="text-center">No hay alumnos asignados a este curso</td>';
+            fila.innerHTML = '<td colspan="5" class="text-center">No hay alumnos asignados a este curso</td>';
             tbody.appendChild(fila);
         } else {
             alumnosDelCurso.forEach(alumno => {
                 const fila = document.createElement('tr');
+                fila.className = 'clickable-row';
                 fila.innerHTML = `
+                    <td>
+                        ${alumno.foto ? 
+                            `<img src="${alumno.foto}" class="alumno-thumb" alt="Foto" style="width: 35px; height: 35px; border-radius: 50%; object-fit: cover;">` : 
+                            `<i class="fas fa-user-circle" style="font-size: 35px; color: #bdc3c7;"></i>`
+                        }
+                    </td>
                     <td>${alumno.nombre || ''}</td>
                     <td>${alumno.apellido || ''}</td>
+                    <td>${alumno.dni || '-'}</td>
+                    <td>
+                        <button class="btn-icon ver-ficha" data-id="${alumno.tarjeta_id}">
+                            <i class="fas fa-id-card"></i> Ver Ficha
+                        </button>
+                    </td>
                 `;
+                fila.addEventListener('click', (e) => {
+                    if (!e.target.closest('.ver-ficha')) {
+                        mostrarFichaAlumno(alumno.tarjeta_id);
+                    }
+                });
                 tbody.appendChild(fila);
+            });
+            
+            document.querySelectorAll('.ver-ficha').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    mostrarFichaAlumno(btn.getAttribute('data-id'));
+                });
             });
         }
     }
@@ -727,13 +894,23 @@ function cargarTablaPersonasSimplificada(filtro = 'todos') {
 
     personasFiltradas.forEach(persona => {
         const fila = document.createElement('tr');
+        fila.className = 'clickable-row';
         fila.innerHTML = `
+            <td>
+                ${persona.foto ? 
+                    `<img src="${persona.foto}" class="user-thumb" alt="Foto" style="width: 35px; height: 35px; border-radius: 50%; object-fit: cover;">` : 
+                    `<i class="fas fa-user-circle" style="font-size: 35px; color: #bdc3c7;"></i>`
+                }
+            </td>
             <td>${persona.tarjeta_id || persona.id || '-'}</td>
             <td>${persona.nombre}</td>
             <td>${persona.apellido}</td>
             <td><span class="rol-badge ${persona.rol}">${persona.rol}</span></td>
             <td>${persona.detalle || '-'}</td>
             <td>
+                <button class="btn-icon ver-ficha-persona" data-id="${persona.tarjeta_id || persona.id}">
+                    <i class="fas fa-id-card"></i> Ver Ficha
+                </button>
                 <button class="btn-icon" onclick="editarPersona('${persona.tarjeta_id || persona.id}')">
                     <i class="fas fa-edit"></i>
                 </button>
@@ -742,7 +919,19 @@ function cargarTablaPersonasSimplificada(filtro = 'todos') {
                 </button>
             </td>
         `;
+        fila.addEventListener('click', (e) => {
+            if (!e.target.closest('.ver-ficha-persona') && !e.target.closest('.btn-icon')) {
+                mostrarFichaAlumno(persona.tarjeta_id || persona.id);
+            }
+        });
         tbody.appendChild(fila);
+    });
+    
+    document.querySelectorAll('.ver-ficha-persona').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            mostrarFichaAlumno(btn.getAttribute('data-id'));
+        });
     });
 }
 
@@ -756,7 +945,14 @@ function cargarTablaPersonasPrincipal() {
     
     datosFiltrados.forEach(persona => {
         const fila = document.createElement('tr');
+        fila.className = 'clickable-row';
         fila.innerHTML = `
+            <td>
+                ${persona.foto ? 
+                    `<img src="${persona.foto}" class="user-thumb" alt="Foto" style="width: 35px; height: 35px; border-radius: 50%; object-fit: cover;">` : 
+                    `<i class="fas fa-user-circle" style="font-size: 35px; color: #bdc3c7;"></i>`
+                }
+            </td>
             <td><strong>${persona.tarjeta_id || 'No asignado'}</strong></td>
             <td>${persona.nombre}</td>
             <td>${persona.apellido}</td>
@@ -765,6 +961,9 @@ function cargarTablaPersonasPrincipal() {
             <td><span class="status ${persona.estado === 'Presente' ? 'active' : 'inactive'}">${persona.estado}</span></td>
             <td>${new Date(persona.fecha_registro).toLocaleDateString()}</td>
             <td>
+                <button class="btn-icon ver-ficha-asistencia" data-id="${persona.tarjeta_id}">
+                    <i class="fas fa-id-card"></i>
+                </button>
                 <button class="btn-icon editar-persona" data-id="${persona.tarjeta_id}">
                     <i class="fas fa-edit"></i>
                 </button>
@@ -773,6 +972,11 @@ function cargarTablaPersonasPrincipal() {
                 </button>
             </td>
         `;
+        fila.addEventListener('click', (e) => {
+            if (!e.target.closest('.ver-ficha-asistencia') && !e.target.closest('.editar-persona') && !e.target.closest('.eliminar-persona')) {
+                mostrarFichaAlumno(persona.tarjeta_id);
+            }
+        });
         tbody.appendChild(fila);
     });
     
@@ -781,6 +985,13 @@ function cargarTablaPersonasPrincipal() {
     
     if (personasCountEl) personasCountEl.textContent = datosFiltrados.length;
     if (totalCountEl) totalCountEl.textContent = listaPersonas.length;
+    
+    document.querySelectorAll('.ver-ficha-asistencia').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            mostrarFichaAlumno(btn.getAttribute('data-id'));
+        });
+    });
     
     agregarEventListenersAcciones();
 }
@@ -801,7 +1012,8 @@ function filtrarPersonas() {
             p.nombre.toLowerCase().includes(terminoBusqueda) ||
             p.apellido.toLowerCase().includes(terminoBusqueda) ||
             (p.tarjeta_id && p.tarjeta_id.toLowerCase().includes(terminoBusqueda)) ||
-            (p.detalle && p.detalle.toLowerCase().includes(terminoBusqueda))
+            (p.detalle && p.detalle.toLowerCase().includes(terminoBusqueda)) ||
+            (p.dni && p.dni.toLowerCase().includes(terminoBusqueda))
         );
     }
     
@@ -810,7 +1022,8 @@ function filtrarPersonas() {
 
 function agregarEventListenersAcciones() {
     document.querySelectorAll('.editar-persona').forEach(boton => {
-        boton.addEventListener('click', function() {
+        boton.addEventListener('click', function(e) {
+            e.stopPropagation();
             if (!verificarPermiso('editar_personas')) return;
             const tarjetaId = this.getAttribute('data-id');
             editarPersona(tarjetaId);
@@ -818,7 +1031,8 @@ function agregarEventListenersAcciones() {
     });
     
     document.querySelectorAll('.eliminar-persona').forEach(boton => {
-        boton.addEventListener('click', function() {
+        boton.addEventListener('click', function(e) {
+            e.stopPropagation();
             if (!verificarPermiso('eliminar_personas')) return;
             const tarjetaId = this.getAttribute('data-id');
             eliminarPersonaPorId(tarjetaId);
@@ -1098,6 +1312,7 @@ function manejarEnvioNuevaPersona(e) {
     
     const nombre = document.getElementById('nombre').value;
     const apellido = document.getElementById('apellido').value;
+    const dni = document.getElementById('dni').value;
     const campoAdicional = document.getElementById('inputDinamico') ? document.getElementById('inputDinamico').value : '';
     
     if (!campoAdicional) {
@@ -1112,13 +1327,16 @@ function manejarEnvioNuevaPersona(e) {
     }
     
     const nuevaPersona = {
+        id: Date.now().toString(),
         tarjeta_id: codigoRFID || `MANUAL_${Date.now()}`,
         nombre: nombre,
         apellido: apellido,
+        dni: dni || null,
         rol: rol,
         detalle: campoAdicional,
         estado: 'Presente',
-        fecha_registro: new Date().toISOString()
+        fecha_registro: new Date().toISOString(),
+        foto: fotoSeleccionada || null
     };
     
     listaPersonas.push(nuevaPersona);
@@ -1144,6 +1362,7 @@ function exportarAExcel() {
         'ID Tarjeta': persona.tarjeta_id || 'No asignado',
         'Nombre': persona.nombre,
         'Apellido': persona.apellido,
+        'DNI': persona.dni || '-',
         'Rol': persona.rol,
         'Detalle': persona.detalle || '',
         'Estado': persona.estado,
@@ -1266,6 +1485,8 @@ function manejarNuevoUsuario(e) {
         contrasena,
         cargo,
         activo: true,
+        nombre: usuario,
+        foto: null,
         fechaCreacion: new Date().toISOString()
     };
     
@@ -1469,11 +1690,33 @@ function inicializarEventListeners() {
     const abrirModalNuevaPersona = () => {
         if (!verificarPermiso('crear_personas')) return;
         resetearRFID();
+        fotoSeleccionada = null;
+        const previewImg = document.getElementById('previewImage');
+        if (previewImg) {
+            previewImg.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23bdc3c7'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E";
+        }
+        document.getElementById('btnEliminarFoto').style.display = 'none';
         mostrarModal('nuevoAlumnoModal');
     };
     
     if (btnNuevaPersona) btnNuevaPersona.addEventListener('click', abrirModalNuevaPersona);
     if (nuevaPersonaBtn) nuevaPersonaBtn.addEventListener('click', abrirModalNuevaPersona);
+    
+    // Carga de foto
+    const fotoInput = document.getElementById('fotoPerfil');
+    const btnEliminarFoto = document.getElementById('btnEliminarFoto');
+    
+    if (fotoInput) {
+        fotoInput.addEventListener('change', (e) => {
+            if (e.target.files && e.target.files[0]) {
+                manejarSeleccionFoto(e.target.files[0]);
+            }
+        });
+    }
+    
+    if (btnEliminarFoto) {
+        btnEliminarFoto.addEventListener('click', eliminarFotoSeleccionada);
+    }
     
     // Rol change
     const rolSelect = document.getElementById('rol');
@@ -1582,7 +1825,7 @@ function inicializarEventListeners() {
 // ==================== PUNTO DE ENTRADA PRINCIPAL ====================
 
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('Sistema iniciado - Con modales de notificación');
+    console.log('Sistema iniciado - Versión completa con fotos y fichas de alumnos');
     
     cargarDatosIniciales();
     inicializarModales();
