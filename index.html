@@ -26,43 +26,8 @@
             </button>
         </div>
         <nav class="sidebar-nav">
-            <ul>
-                <li>
-                    <a href="#home" class="nav-link active" data-section="home">
-                        <i class="fas fa-home"></i>
-                        <span>Home</span>
-                    </a>
-                </li>
-                <li>
-                    <a href="#personas" class="nav-link" data-section="personas">
-                        <i class="fas fa-users"></i>
-                        <span>Personas</span>
-                    </a>
-                </li>
-                <li>
-                    <a href="#cursos" class="nav-link" data-section="cursos">
-                        <i class="fas fa-graduation-cap"></i>
-                        <span>Cursos</span>
-                    </a>
-                </li>
-                <li>
-                    <a href="#asistencias" class="nav-link" data-section="asistencias">
-                        <i class="fas fa-clipboard-check"></i>
-                        <span>Asistencias</span>
-                    </a>
-                </li>
-                <li id="navEstadisticas" class="nav-item-oculto" style="display: none;">
-                    <a href="#estadisticas" class="nav-link" data-section="estadisticas">
-                        <i class="fas fa-chart-pie"></i>
-                        <span>Estadísticas</span>
-                    </a>
-                </li>
-                <li>
-                    <a href="#administracion" class="nav-link" data-section="administracion">
-                        <i class="fas fa-cogs"></i>
-                        <span>Administración</span>
-                    </a>
-                </li>
+            <ul id="sidebarMenu">
+                <!-- El menú se genera dinámicamente según el rol -->
             </ul>
         </nav>
     </div>
@@ -88,36 +53,55 @@
                     <i class="fas fa-sign-out-alt"></i>
                 </button>
             </div>
+            <button id="btnLoginHeader" class="btn-login-header" style="display: none;">
+                <i class="fas fa-sign-in-alt"></i> Iniciar Sesión
+            </button>
         </header>
 
         <main class="content">
-            <!-- ==================== SECCIÓN HOME ==================== -->
-            <section id="home" class="section active">
-                <div class="main-title-container">
-                    <h2 class="main-title">LISTA AUTOMATIZADA POR RFID</h2>
+            <!-- ==================== SECCIÓN LOGIN (visible sin sesión) ==================== -->
+            <section id="loginSection" class="section active">
+                <div class="login-container">
+                    <div class="login-card">
+                        <div class="login-header">
+                            <i class="fas fa-school"></i>
+                            <h2>Expotec 2026</h2>
+                            <p>Sistema de Gestión Escolar</p>
+                        </div>
+                        <form id="formLoginPrincipal">
+                            <div class="form-group">
+                                <label><i class="fas fa-user"></i> Usuario</label>
+                                <input type="text" id="loginUsuario" placeholder="Ingrese su usuario" required>
+                            </div>
+                            <div class="form-group">
+                                <label><i class="fas fa-lock"></i> Contraseña</label>
+                                <input type="password" id="loginContrasena" placeholder="Ingrese su contraseña" required>
+                            </div>
+                            <button type="submit" class="btn btn-primary btn-login">
+                                <i class="fas fa-sign-in-alt"></i> Iniciar Sesión
+                            </button>
+                        </form>
+                        <div class="login-footer">
+                            <p>Contacte al administrador para obtener sus credenciales</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ==================== SECCIÓN ANUNCIOS ==================== -->
+            <section id="anuncios" class="section">
+                <div class="section-header">
+                    <h2><i class="fas fa-bullhorn"></i> Anuncios y Comunicados</h2>
+                    <p class="subtitle">Información importante de la institución</p>
                 </div>
                 <div class="section-content">
-                    <div class="welcome-card">
-                        <h3>Bienvenido a Expotec 2026</h3>
-                        <p>Este sistema permite gestionar la asistencia de alumnos mediante tecnología RFID de forma automatizada y eficiente.</p>
-                        <p>Utiliza el panel lateral para navegar entre las diferentes secciones del sistema.</p>
+                    <div id="btnCrearAnuncioContainer" class="action-bar" style="display: none;">
+                        <button class="btn btn-primary" id="btnCrearAnuncio">
+                            <i class="fas fa-plus"></i> Nuevo Anuncio
+                        </button>
                     </div>
-                    <div class="features-grid">
-                        <div class="feature-card">
-                            <i class="fas fa-id-card"></i>
-                            <h4>Registro RFID</h4>
-                            <p>Registro automático de asistencia mediante tarjetas RFID.</p>
-                        </div>
-                        <div class="feature-card">
-                            <i class="fas fa-chart-bar"></i>
-                            <h4>Reportes</h4>
-                            <p>Generación de reportes de asistencia en tiempo real.</p>
-                        </div>
-                        <div class="feature-card">
-                            <i class="fas fa-user-check"></i>
-                            <h4>Control de Acceso</h4>
-                            <p>Control de acceso a eventos y áreas específicas.</p>
-                        </div>
+                    <div id="anunciosList" class="anuncios-container">
+                        <!-- Los anuncios se cargan dinámicamente -->
                     </div>
                 </div>
             </section>
@@ -302,7 +286,7 @@
                 </div>
             </section>
 
-            <!-- ==================== SECCIÓN ESTADÍSTICAS ==================== -->
+            <!-- ==================== SECCIÓN ESTADÍSTICAS (solo directivos) ==================== -->
             <section id="estadisticas" class="section">
                 <div class="section-header">
                     <h2>Panel de Estadísticas</h2>
@@ -433,6 +417,36 @@
                 </div>
             </section>
 
+            <!-- ==================== SECCIÓN USUARIOS (solo directivos) ==================== -->
+            <section id="usuariosGestion" class="section">
+                <div class="section-header">
+                    <h2><i class="fas fa-users-cog"></i> Gestión de Usuarios del Sistema</h2>
+                    <p class="subtitle">Asociar cuentas de usuario a personas registradas</p>
+                </div>
+                <div class="section-content">
+                    <div class="action-bar">
+                        <button class="btn btn-primary" id="btnAsociarUsuario">
+                            <i class="fas fa-link"></i> Asociar Usuario a Persona
+                        </button>
+                    </div>
+                    <div class="table-container">
+                        <table class="data-table" id="usuariosGestionTable">
+                            <thead>
+                                <tr>
+                                    <th>Usuario</th>
+                                    <th>Persona Asociada</th>
+                                    <th>Rol</th>
+                                    <th>Estado</th>
+                                    <th>Fecha Creación</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="usuariosGestionTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
             <!-- ==================== SECCIÓN ADMINISTRACIÓN ==================== -->
             <section id="administracion" class="section">
                 <div class="section-header">
@@ -448,22 +462,10 @@
                             <button class="btn btn-secondary" id="btnExportar">Exportar a Excel</button>
                         </div>
                         <div class="admin-card">
-                            <i class="fas fa-users-cog"></i>
-                            <h4>Gestión de Usuarios</h4>
-                            <p>Crear y administrar usuarios del sistema junto a los permisos.</p>
-                            <button class="btn btn-secondary" id="btnGestionUsuarios">Gestionar</button>
-                        </div>
-                        <div class="admin-card">
                             <i class="fas fa-cog"></i>
                             <h4>Configuración</h4>
                             <p>Personaliza la configuración del sistema y sus opciones.</p>
                             <button class="btn btn-secondary" id="btnConfiguracion">Configurar</button>
-                        </div>
-                        <div class="admin-card">
-                            <i class="fas fa-door-open"></i>
-                            <h4>Cerrar Sesión</h4>
-                            <p>Cerrar la sesión actual del administrador con permisos.</p>
-                            <button class="btn btn-secondary" id="btnCerrarSesion">Cerrar Sesión</button>
                         </div>
                     </div>
                 </div>
@@ -520,7 +522,99 @@
                 </div>
             </div>
 
-            <!-- Modal para nueva persona con carga de imagen -->
+            <!-- Modal para asociar usuario a persona -->
+            <div id="asociarUsuarioModal" class="modal">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3>Asociar Usuario a Persona</h3>
+                        <button class="close-modal">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="formAsociarUsuario">
+                            <div class="form-group">
+                                <label><i class="fas fa-user"></i> Seleccionar Persona</label>
+                                <div class="custom-dropdown">
+                                    <select id="selectPersona" name="id_persona" required>
+                                        <option value="">Seleccionar persona...</option>
+                                    </select>
+                                    <i class="fas fa-chevron-down dropdown-arrow"></i>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label><i class="fas fa-user-circle"></i> Nombre de Usuario</label>
+                                <input type="text" id="nuevoUsuarioNombre" placeholder="Ej: juan.perez" required>
+                            </div>
+                            <div class="form-group">
+                                <label><i class="fas fa-lock"></i> Contraseña</label>
+                                <input type="password" id="nuevoUsuarioPass" placeholder="Mínimo 4 caracteres" required>
+                            </div>
+                            <div class="form-group">
+                                <label><i class="fas fa-user-tag"></i> Rol en el Sistema</label>
+                                <div class="custom-dropdown">
+                                    <select id="nuevoUsuarioRol" required>
+                                        <option value="">Seleccionar rol...</option>
+                                        <option value="alumno">Alumno</option>
+                                        <option value="profesor">Profesor</option>
+                                        <option value="preceptor">Preceptor</option>
+                                        <option value="directivo">Directivo</option>
+                                    </select>
+                                    <i class="fas fa-chevron-down dropdown-arrow"></i>
+                                </div>
+                                <small class="form-hint">El rol determina qué secciones puede ver el usuario</small>
+                            </div>
+                            <div class="modal-actions">
+                                <button type="button" class="btn btn-cancel">Cancelar</button>
+                                <button type="submit" class="btn btn-primary">Asociar Usuario</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal para crear anuncio -->
+            <div id="crearAnuncioModal" class="modal">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3><i class="fas fa-bullhorn"></i> Crear Nuevo Anuncio</h3>
+                        <button class="close-modal">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="formCrearAnuncio">
+                            <div class="form-group">
+                                <label><i class="fas fa-tag"></i> Título</label>
+                                <input type="text" id="anuncioTitulo" placeholder="Ej: Suspensión de clases" required>
+                            </div>
+                            <div class="form-group">
+                                <label><i class="fas fa-align-left"></i> Contenido</label>
+                                <textarea id="anuncioContenido" rows="5" placeholder="Escriba el contenido del anuncio..." required></textarea>
+                            </div>
+                            <div class="form-group">
+                                <label><i class="fas fa-users"></i> Visible para</label>
+                                <div class="custom-dropdown">
+                                    <select id="anuncioVisibilidad" required>
+                                        <option value="todos">Todos los usuarios</option>
+                                        <option value="alumnos">Solo alumnos</option>
+                                        <option value="profesores">Solo profesores</option>
+                                        <option value="preceptores">Solo preceptores</option>
+                                        <option value="directivos">Solo directivos</option>
+                                    </select>
+                                    <i class="fas fa-chevron-down dropdown-arrow"></i>
+                                </div>
+                            </div>
+                            <div class="modal-actions">
+                                <button type="button" class="btn btn-cancel">Cancelar</button>
+                                <button type="submit" class="btn btn-primary">Publicar Anuncio</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal para nueva persona -->
             <div id="nuevoAlumnoModal" class="modal">
                 <div class="modal-content">
                     <div class="modal-header">
@@ -531,7 +625,6 @@
                     </div>
                     <div class="modal-body">
                         <form id="formNuevoAlumno">
-                            <!-- Sección de carga de imagen -->
                             <div class="photo-upload-container">
                                 <div class="photo-preview" id="photoPreview">
                                     <img id="previewImage" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23bdc3c7'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E" alt="Foto de perfil">
@@ -559,7 +652,6 @@
                                 </div>
                             </div>
                             
-                            <!-- DNI opcional -->
                             <div class="form-group">
                                 <label for="dni"><i class="fas fa-id-card"></i> DNI</label>
                                 <input type="text" id="dni" name="dni" placeholder="Opcional">
@@ -670,86 +762,6 @@
                 </div>
             </div>
 
-            <!-- Modal de Gestión de Usuarios -->
-            <div id="gestionUsuariosModal" class="modal">
-                <div class="modal-content modal-large">
-                    <div class="modal-header">
-                        <h3>Gestión de Usuarios</h3>
-                        <button class="close-modal">
-                            <i class="fas fa-times"></i>
-                        </button>
-                    </div>
-                    <div class="modal-body">
-                        <div class="action-bar">
-                            <button class="btn btn-primary" id="btnNuevoUsuario">
-                                <i class="fas fa-plus"></i> Nuevo Usuario
-                            </button>
-                        </div>
-                        <div class="table-container">
-                            <table class="data-table">
-                                <thead>
-                                    <tr>
-                                        <th>Usuario</th>
-                                        <th>Cargo</th>
-                                        <th>Estado</th>
-                                        <th>Acciones</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="usuariosTableBody"></tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Modal de Nuevo Usuario -->
-            <div id="nuevoUsuarioModal" class="modal">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h3>Nuevo Usuario</h3>
-                        <button class="close-modal">
-                            <i class="fas fa-times"></i>
-                        </button>
-                    </div>
-                    <div class="modal-body">
-                        <form id="formNuevoUsuario">
-                            <div class="form-group">
-                                <label for="usuario"><i class="fas fa-user"></i> Usuario</label>
-                                <input type="text" id="usuario" name="usuario" required>
-                            </div>
-                            <div class="form-group">
-                                <label for="contrasena"><i class="fas fa-lock"></i> Contraseña</label>
-                                <input type="password" id="contrasena" name="contrasena" required>
-                            </div>
-                            <div class="form-group">
-                                <label for="cargoUsuario"><i class="fas fa-user-tag"></i> Cargo</label>
-                                <div class="custom-dropdown">
-                                    <select id="cargoUsuario" name="cargo" required>
-                                        <option value="">Seleccionar cargo</option>
-                                        <option value="directivo">Directivo</option>
-                                        <option value="profesor">Profesor</option>
-                                        <option value="preceptor">Preceptor</option>
-                                    </select>
-                                    <i class="fas fa-chevron-down dropdown-arrow"></i>
-                                </div>
-                            </div>
-                            <div class="permisos-info">
-                                <h4>Permisos por Cargo:</h4>
-                                <ul>
-                                    <li><strong>Directivo:</strong> Acceso completo (ver estadísticas, editar, eliminar)</li>
-                                    <li><strong>Profesor:</strong> Solo ver asistencias (sin editar)</li>
-                                    <li><strong>Preceptor:</strong> Solo ver asistencias (sin editar)</li>
-                                </ul>
-                            </div>
-                            <div class="modal-actions">
-                                <button type="button" class="btn btn-cancel">Cancelar</button>
-                                <button type="submit" class="btn btn-primary">Guardar Usuario</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            </div>
-
             <!-- Modal de Configuración -->
             <div id="configuracionModal" class="modal">
                 <div class="modal-content">
@@ -840,7 +852,7 @@
                 </div>
             </div>
 
-            <!-- Modal de Alumnos del Curso (actualizado con fotos) -->
+            <!-- Modal de Alumnos del Curso -->
             <div id="alumnosCursoModal" class="modal">
                 <div class="modal-content modal-large">
                     <div class="modal-header">
@@ -869,34 +881,6 @@
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-primary close-modal">Cerrar</button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Modal de Login Administrativo -->
-            <div id="loginAdminModal" class="modal">
-                <div class="modal-content modal-small">
-                    <div class="modal-header">
-                        <h3>Acceso Administrativo</h3>
-                        <button class="close-modal">
-                            <i class="fas fa-times"></i>
-                        </button>
-                    </div>
-                    <div class="modal-body">
-                        <form id="formLoginAdmin">
-                            <div class="form-group">
-                                <label for="adminUsuario"><i class="fas fa-user"></i> Usuario</label>
-                                <input type="text" id="adminUsuario" name="usuario" required>
-                            </div>
-                            <div class="form-group">
-                                <label for="adminContrasena"><i class="fas fa-lock"></i> Contraseña</label>
-                                <input type="password" id="adminContrasena" name="contrasena" required>
-                            </div>
-                            <div class="modal-actions">
-                                <button type="button" class="btn btn-cancel">Cancelar</button>
-                                <button type="submit" class="btn btn-primary">Acceder</button>
-                            </div>
-                        </form>
                     </div>
                 </div>
             </div>

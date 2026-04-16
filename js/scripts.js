@@ -1,17 +1,16 @@
 /**
  * ============================================================================
- * SISTEMA DE GESTIÓN ESCOLAR CON RFID - VERSIÓN COMPLETA
+ * SISTEMA DE GESTIÓN ESCOLAR CON RFID - VERSIÓN COMPLETA CON PERMISOS
  * ============================================================================
  * 
- * Características:
- * - Foto de perfil en sidebar y header
- * - Carga de imágenes al registrar personas
- * - Ficha de alumno accesible desde cursos y personas
- * - Modales de notificación personalizados
- * - Control de permisos por rol
+ * PERMISOS POR ROL:
+ * - Sin login: Solo ve pantalla de login
+ * - Alumno: Solo ve "Anuncios"
+ * - Profesor: Ve "Asistencias" y "Anuncios"
+ * - Preceptor: Ve "Personas", "Cursos", "Asistencias", "Anuncios"
+ * - Directivo: Ve todo (Personas, Cursos, Asistencias, Estadísticas, Usuarios, Administración, Anuncios)
  * 
- * @version 3.0
- * @author Sistema Expotec 2026
+ * @version 4.1
  * ============================================================================
  */
 
@@ -22,22 +21,30 @@ let lectorSerial = null;
 let listaPersonas = [];
 let listaUsuarios = [];
 let listaCursos = [];
+let listaAnuncios = [];
 let usuarioActual = null;
 let filtroActual = 'todos';
 let confirmCallback = null;
 let fotoSeleccionada = null;
 let personaActualFicha = null;
+let currentPage = 1;
+let itemsPerPage = 10;
 
 let configuracionSistema = {
     tema: 'default',
     autoSave: true
 };
 
-// ==================== FUNCIONES DE MODALES DE NOTIFICACIÓN ====================
+// ==================== FUNCIONES DE MODALES ====================
 
+/**
+ * Muestra una notificación modal
+ * @param {string} mensaje - Texto a mostrar
+ * @param {string} tipo - 'info', 'success', 'error', 'warning'
+ * @param {string|null} titulo - Título personalizado
+ */
 function mostrarNotificacion(mensaje, tipo = 'info', titulo = null) {
     const modal = document.getElementById('notificationModal');
-    const header = document.getElementById('notificationHeader');
     const icon = document.getElementById('notificationIcon');
     const titleEl = document.getElementById('notificationTitle');
     const messageEl = document.getElementById('notificationMessage');
@@ -62,7 +69,6 @@ function mostrarNotificacion(mensaje, tipo = 'info', titulo = null) {
             claseTipo = 'notification-warning';
             tituloPorDefecto = 'Advertencia';
             break;
-        case 'info':
         default:
             icono = 'fa-info-circle';
             claseTipo = 'notification-info';
@@ -71,7 +77,6 @@ function mostrarNotificacion(mensaje, tipo = 'info', titulo = null) {
     }
     
     icon.className = `fas ${icono}`;
-    modal.classList.add(claseTipo);
     titleEl.textContent = titulo || tituloPorDefecto;
     messageEl.textContent = mensaje;
     
@@ -79,83 +84,85 @@ function mostrarNotificacion(mensaje, tipo = 'info', titulo = null) {
     document.body.style.overflow = 'hidden';
     
     const closeBtn = document.getElementById('notificationCloseBtn');
-    const closeModalBtn = modal.querySelector('.close-modal');
-    
-    const cerrarNotificacion = () => {
+    const cerrar = () => {
         modal.classList.remove('active');
-        modal.classList.remove(claseTipo);
         document.body.style.overflow = 'auto';
-        closeBtn.removeEventListener('click', cerrarNotificacion);
-        if (closeModalBtn) closeModalBtn.removeEventListener('click', cerrarNotificacion);
+        closeBtn.removeEventListener('click', cerrar);
     };
-    
-    closeBtn.addEventListener('click', cerrarNotificacion);
-    if (closeModalBtn) closeModalBtn.addEventListener('click', cerrarNotificacion);
-    
-    modal.addEventListener('click', function(e) {
-        if (e.target === modal) {
-            cerrarNotificacion();
-        }
-    });
+    closeBtn.addEventListener('click', cerrar);
+    modal.querySelector('.close-modal')?.addEventListener('click', cerrar);
 }
 
+/**
+ * Muestra un diálogo de confirmación
+ * @param {string} mensaje 
+ * @param {Function} callbackOk 
+ * @param {Function} callbackCancel 
+ */
 function mostrarConfirmacion(mensaje, callbackOk, callbackCancel = null) {
     const modal = document.getElementById('confirmModal');
     const messageEl = document.getElementById('confirmMessage');
     const okBtn = document.getElementById('confirmOkBtn');
     const cancelBtn = document.getElementById('confirmCancelBtn');
-    const closeModalBtn = modal.querySelector('.close-modal');
     
     messageEl.textContent = mensaje;
     confirmCallback = { ok: callbackOk, cancel: callbackCancel };
     
-    const cerrarConfirmacion = () => {
+    const cerrar = () => {
         modal.classList.remove('active');
         document.body.style.overflow = 'auto';
         okBtn.removeEventListener('click', handleOk);
         cancelBtn.removeEventListener('click', handleCancel);
-        if (closeModalBtn) closeModalBtn.removeEventListener('click', handleCancel);
     };
     
     const handleOk = () => {
-        if (confirmCallback && confirmCallback.ok) confirmCallback.ok();
-        cerrarConfirmacion();
+        if (confirmCallback?.ok) confirmCallback.ok();
+        cerrar();
     };
     
     const handleCancel = () => {
-        if (confirmCallback && confirmCallback.cancel) confirmCallback.cancel();
-        cerrarConfirmacion();
+        if (confirmCallback?.cancel) confirmCallback.cancel();
+        cerrar();
     };
     
     okBtn.addEventListener('click', handleOk);
     cancelBtn.addEventListener('click', handleCancel);
-    if (closeModalBtn) closeModalBtn.addEventListener('click', handleCancel);
-    
-    modal.addEventListener('click', function(e) {
-        if (e.target === modal) {
-            handleCancel();
-        }
-    });
+    modal.querySelector('.close-modal')?.addEventListener('click', handleCancel);
     
     modal.classList.add('active');
     document.body.style.overflow = 'hidden';
 }
 
+/**
+ * Muestra un modal de carga
+ * @param {string} mensaje 
+ */
 function mostrarCarga(mensaje = 'Procesando...') {
     const modal = document.getElementById('loadingModal');
-    const messageEl = document.getElementById('loadingMessage');
-    messageEl.textContent = mensaje;
+    document.getElementById('loadingMessage').textContent = mensaje;
     modal.classList.add('active');
-    document.body.style.overflow = 'hidden';
 }
 
 function ocultarCarga() {
-    const modal = document.getElementById('loadingModal');
+    document.getElementById('loadingModal').classList.remove('active');
+}
+
+function cerrarModal(modalId) {
+    const modal = document.getElementById(modalId);
+    if (!modal) return;
     modal.classList.remove('active');
     document.body.style.overflow = 'auto';
 }
 
-// ==================== FUNCIONES DE FOTO DE PERFIL ====================
+function mostrarModal(modalId) {
+    const modal = document.getElementById(modalId);
+    if (modal) {
+        modal.classList.add('active');
+        document.body.style.overflow = 'hidden';
+    }
+}
+
+// ==================== FUNCIONES DE FOTO ====================
 
 function convertirImagenABase64(file) {
     return new Promise((resolve, reject) => {
@@ -204,12 +211,370 @@ function eliminarFotoSeleccionada() {
     mostrarNotificacion('Foto eliminada', 'info');
 }
 
-// ==================== FUNCIONES DE FICHA DEL ALUMNO ====================
+// ==================== SISTEMA DE PERMISOS Y MENÚ ====================
+
+const SECCIONES = {
+    anuncios: { id: 'anuncios', icono: 'fa-bullhorn', texto: 'Anuncios', roles: ['alumno', 'profesor', 'preceptor', 'directivo'] },
+    personas: { id: 'personas', icono: 'fa-users', texto: 'Personas', roles: ['preceptor', 'directivo'] },
+    cursos: { id: 'cursos', icono: 'fa-graduation-cap', texto: 'Cursos', roles: ['preceptor', 'directivo'] },
+    asistencias: { id: 'asistencias', icono: 'fa-clipboard-check', texto: 'Asistencias', roles: ['profesor', 'preceptor', 'directivo'] },
+    estadisticas: { id: 'estadisticas', icono: 'fa-chart-pie', texto: 'Estadísticas', roles: ['directivo'] },
+    usuariosGestion: { id: 'usuariosGestion', icono: 'fa-users-cog', texto: 'Usuarios', roles: ['directivo'] },
+    administracion: { id: 'administracion', icono: 'fa-cogs', texto: 'Administración', roles: ['directivo'] }
+};
+
+function obtenerSeccionesPorRol(rol) {
+    const secciones = [];
+    for (const [key, seccion] of Object.entries(SECCIONES)) {
+        if (seccion.roles.includes(rol)) {
+            secciones.push(seccion);
+        }
+    }
+    return secciones;
+}
+
+/**
+ * Refresca el contenido de la sección activa según su ID
+ * @param {string} sectionId 
+ */
+function refrescarSeccionActiva(sectionId) {
+    switch(sectionId) {
+        case 'anuncios':
+            cargarAnuncios();
+            break;
+        case 'personas':
+            cargarTablaPersonasSimplificada(filtroActual);
+            break;
+        case 'cursos':
+            cargarTablaCursos();
+            break;
+        case 'asistencias':
+            cargarTablaPersonasPrincipal();
+            actualizarEstadisticasRapidas();
+            break;
+        case 'estadisticas':
+            if (usuarioActual?.rol === 'directivo') cargarEstadisticasDetalladas();
+            break;
+        case 'usuariosGestion':
+            if (usuarioActual?.rol === 'directivo') cargarTablaUsuariosGestion();
+            break;
+        case 'administracion':
+            // No requiere carga dinámica
+            break;
+        default:
+            break;
+    }
+}
+
+function renderizarSidebar() {
+    const sidebarMenu = document.getElementById('sidebarMenu');
+    if (!sidebarMenu) return;
+    
+    if (!usuarioActual) {
+        sidebarMenu.innerHTML = '<li style="padding: 1rem; text-align: center; color: rgba(255,255,255,0.5);">Inicie sesión para ver las opciones</li>';
+        return;
+    }
+    
+    const secciones = obtenerSeccionesPorRol(usuarioActual.rol);
+    
+    if (secciones.length === 0) {
+        sidebarMenu.innerHTML = '<li style="padding: 1rem; text-align: center; color: rgba(255,255,255,0.5);">Sin opciones disponibles</li>';
+        return;
+    }
+    
+    sidebarMenu.innerHTML = secciones.map(seccion => `
+        <li>
+            <a href="#${seccion.id}" class="nav-link" data-section="${seccion.id}">
+                <i class="fas ${seccion.icono}"></i>
+                <span>${seccion.texto}</span>
+            </a>
+        </li>
+    `).join('');
+    
+    document.querySelectorAll('.nav-link').forEach(link => {
+        link.addEventListener('click', function(e) {
+            e.preventDefault();
+            document.querySelectorAll('.nav-link').forEach(nav => nav.classList.remove('active'));
+            this.classList.add('active');
+            document.querySelectorAll('.section').forEach(section => section.classList.remove('active'));
+            const sectionId = this.getAttribute('data-section');
+            const targetSection = document.getElementById(sectionId);
+            if (targetSection) targetSection.classList.add('active');
+            // Refrescar datos de la sección al mostrarla
+            refrescarSeccionActiva(sectionId);
+            if (window.innerWidth < 992) cerrarSidebar();
+        });
+    });
+    
+    const primeraSeccion = secciones[0]?.id;
+    if (primeraSeccion) {
+        document.querySelectorAll('.section').forEach(section => section.classList.remove('active'));
+        document.getElementById(primeraSeccion).classList.add('active');
+        const activeLink = document.querySelector(`.nav-link[data-section="${primeraSeccion}"]`);
+        if (activeLink) activeLink.classList.add('active');
+        refrescarSeccionActiva(primeraSeccion);
+    }
+}
+
+function cerrarSidebar() {
+    document.getElementById('sidebar')?.classList.remove('active');
+    document.getElementById('overlay')?.classList.remove('active');
+    document.body.style.overflow = 'auto';
+}
+
+// ==================== LOGIN ====================
+
+function inicializarLogin() {
+    const formLogin = document.getElementById('formLoginPrincipal');
+    const btnLoginHeader = document.getElementById('btnLoginHeader');
+    
+    if (formLogin) {
+        formLogin.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const usuario = document.getElementById('loginUsuario').value;
+            const contrasena = document.getElementById('loginContrasena').value;
+            
+            const usuarioEncontrado = listaUsuarios.find(u => 
+                u.usuario === usuario && u.contrasena === contrasena && u.activo
+            );
+            
+            if (usuarioEncontrado) {
+                usuarioActual = {
+                    usuario: usuarioEncontrado.usuario,
+                    rol: usuarioEncontrado.rol,
+                    id_persona: usuarioEncontrado.id_persona
+                };
+                localStorage.setItem('usuarioActual', JSON.stringify(usuarioActual));
+                actualizarUIporSesion();
+                mostrarNotificacion(`Bienvenido ${usuarioEncontrado.rol}`, 'success');
+                document.getElementById('loginUsuario').value = '';
+                document.getElementById('loginContrasena').value = '';
+            } else {
+                mostrarNotificacion('Usuario o contraseña incorrectos', 'error');
+            }
+        });
+    }
+    
+    if (btnLoginHeader) {
+        btnLoginHeader.addEventListener('click', () => {
+            document.getElementById('loginSection').classList.add('active');
+            document.querySelectorAll('.section').forEach(s => {
+                if (s.id !== 'loginSection') s.classList.remove('active');
+            });
+        });
+    }
+}
+
+function cerrarSesion() {
+    mostrarConfirmacion('¿Estás seguro de que deseas cerrar sesión?', () => {
+        usuarioActual = null;
+        localStorage.removeItem('usuarioActual');
+        actualizarUIporSesion();
+        mostrarNotificacion('Sesión cerrada correctamente', 'info');
+    });
+}
+
+// ==================== ANUNCIOS ====================
+
+function cargarAnuncios() {
+    const stored = localStorage.getItem('anuncios');
+    if (stored) {
+        listaAnuncios = JSON.parse(stored);
+    } else {
+        listaAnuncios = [
+            {
+                id: 1,
+                titulo: 'Bienvenidos al ciclo lectivo 2024',
+                contenido: 'Se informa a toda la comunidad educativa que el ciclo lectivo dará inicio el día 1 de marzo.',
+                visibilidad: 'todos',
+                autor: 'Dirección',
+                fecha: new Date().toISOString()
+            },
+            {
+                id: 2,
+                titulo: 'Reunión de padres',
+                contenido: 'Se convoca a reunión de padres el día viernes 15 a las 18:00 hs en el salón de actos.',
+                visibilidad: 'todos',
+                autor: 'Preceptoría',
+                fecha: new Date().toISOString()
+            }
+        ];
+        localStorage.setItem('anuncios', JSON.stringify(listaAnuncios));
+    }
+    
+    const container = document.getElementById('anunciosList');
+    if (!container) return;
+    
+    let anunciosFiltrados = listaAnuncios;
+    if (usuarioActual) {
+        anunciosFiltrados = listaAnuncios.filter(a => 
+            a.visibilidad === 'todos' || a.visibilidad === `${usuarioActual.rol}s` || a.visibilidad === usuarioActual.rol
+        );
+    }
+    
+    anunciosFiltrados.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+    
+    if (anunciosFiltrados.length === 0) {
+        container.innerHTML = '<div class="anuncio-card" style="text-align: center;">No hay anuncios disponibles</div>';
+        return;
+    }
+    
+    container.innerHTML = anunciosFiltrados.map(anuncio => `
+        <div class="anuncio-card">
+            <div class="anuncio-header">
+                <span class="anuncio-titulo"><i class="fas fa-bullhorn"></i> ${anuncio.titulo}</span>
+                <span class="anuncio-fecha">${new Date(anuncio.fecha).toLocaleString()}</span>
+            </div>
+            <div class="anuncio-contenido">${anuncio.contenido}</div>
+            <div class="anuncio-autor">
+                <i class="fas fa-user"></i> Publicado por: ${anuncio.autor}
+                <span class="anuncio-visibilidad">
+                    <i class="fas fa-eye"></i> Visible para: ${anuncio.visibilidad === 'todos' ? 'Todos' : anuncio.visibilidad}
+                </span>
+                ${(usuarioActual?.rol === 'directivo' || usuarioActual?.rol === 'preceptor') ? `
+                    <button class="btn-eliminar-anuncio" data-id="${anuncio.id}">
+                        <i class="fas fa-trash"></i> Eliminar
+                    </button>
+                ` : ''}
+            </div>
+        </div>
+    `).join('');
+    
+    document.querySelectorAll('.btn-eliminar-anuncio').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const id = parseInt(btn.getAttribute('data-id'));
+            mostrarConfirmacion('¿Eliminar este anuncio?', () => {
+                listaAnuncios = listaAnuncios.filter(a => a.id !== id);
+                localStorage.setItem('anuncios', JSON.stringify(listaAnuncios));
+                cargarAnuncios();
+                mostrarNotificacion('Anuncio eliminado', 'success');
+            });
+        });
+    });
+}
+
+function crearAnuncio(titulo, contenido, visibilidad) {
+    const nuevoAnuncio = {
+        id: Date.now(),
+        titulo,
+        contenido,
+        visibilidad,
+        autor: usuarioActual?.usuario || 'Administrador',
+        fecha: new Date().toISOString()
+    };
+    listaAnuncios.push(nuevoAnuncio);
+    localStorage.setItem('anuncios', JSON.stringify(listaAnuncios));
+    cargarAnuncios();
+}
+
+// ==================== GESTIÓN DE PERSONAS ====================
+
+/**
+ * Carga la tabla simplificada de personas (sección "Personas")
+ * @param {string} filtro - 'todos', 'alumno', 'profesor', 'preceptor'
+ */
+function cargarTablaPersonasSimplificada(filtro = 'todos') {
+    const tbody = document.getElementById('personasTableBody_personas');
+    if (!tbody) return;
+    
+    let personasFiltradas = listaPersonas;
+    if (filtro !== 'todos') {
+        personasFiltradas = listaPersonas.filter(p => p.rol === filtro);
+    }
+    
+    if (personasFiltradas.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center;">No hay personas registradas</td></tr>';
+        return;
+    }
+    
+    tbody.innerHTML = personasFiltradas.map(persona => `
+        <tr class="clickable-row" data-id="${persona.tarjeta_id || persona.id}">
+            <td>${persona.foto ? `<img src="${persona.foto}" class="user-thumb">` : '<i class="fas fa-user-circle" style="font-size: 35px; color: #bdc3c7;"></i>'}</td>
+            <td>${persona.tarjeta_id || persona.id || '-'}</td>
+            <td>${persona.nombre}</td>
+            <td>${persona.apellido}</td>
+            <td><span class="rol-badge ${persona.rol}">${persona.rol}</span></td>
+            <td>${persona.detalle || '-'}</td>
+            <td>
+                <button class="btn-icon ver-ficha-persona" data-id="${persona.tarjeta_id || persona.id}"><i class="fas fa-id-card"></i></button>
+                <button class="btn-icon editar-persona" data-id="${persona.tarjeta_id || persona.id}"><i class="fas fa-edit"></i></button>
+                <button class="btn-icon eliminar-persona" data-id="${persona.tarjeta_id || persona.id}"><i class="fas fa-trash"></i></button>
+            </td>
+        </tr>
+    `).join('');
+    
+    document.querySelectorAll('.ver-ficha-persona').forEach(btn => {
+        btn.addEventListener('click', (e) => { e.stopPropagation(); mostrarFichaAlumno(btn.getAttribute('data-id')); });
+    });
+}
+
+/**
+ * Carga la tabla principal de personas (sección "Asistencias") con paginación
+ */
+function cargarTablaPersonasPrincipal() {
+    const tbody = document.getElementById('personasTableBody_asistencias');
+    if (!tbody) return;
+    
+    const datosFiltrados = filtrarPersonas();
+    const start = (currentPage - 1) * itemsPerPage;
+    const paginados = datosFiltrados.slice(start, start + itemsPerPage);
+    
+    if (paginados.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9" style="text-align: center;">No hay registros</td></tr>';
+    } else {
+        tbody.innerHTML = paginados.map(persona => `
+            <tr class="clickable-row" data-id="${persona.tarjeta_id}">
+                <td>${persona.foto ? `<img src="${persona.foto}" class="user-thumb">` : '<i class="fas fa-user-circle" style="font-size: 35px; color: #bdc3c7;"></i>'}</td>
+                <td><strong>${persona.tarjeta_id || 'No asignado'}</strong></td>
+                <td>${persona.nombre}</td>
+                <td>${persona.apellido}</td>
+                <td><span class="rol-badge ${persona.rol}">${persona.rol}</span></td>
+                <td>${persona.detalle || '-'}</td>
+                <td><span class="status ${persona.estado === 'Presente' ? 'active' : 'inactive'}">${persona.estado}</span></td>
+                <td>${new Date(persona.fecha_registro).toLocaleDateString()}</td>
+                <td>
+                    <button class="btn-icon ver-ficha-asistencia" data-id="${persona.tarjeta_id}"><i class="fas fa-id-card"></i></button>
+                    ${(usuarioActual?.rol === 'directivo' || usuarioActual?.rol === 'preceptor') ? `
+                        <button class="btn-icon editar-persona" data-id="${persona.tarjeta_id}"><i class="fas fa-edit"></i></button>
+                        <button class="btn-icon eliminar-persona" data-id="${persona.tarjeta_id}"><i class="fas fa-trash"></i></button>
+                    ` : ''}
+                </td>
+            </tr>
+        `).join('');
+    }
+    
+    document.getElementById('personasCount').textContent = datosFiltrados.length;
+    document.getElementById('totalCount').textContent = listaPersonas.length;
+    document.getElementById('currentPage').textContent = currentPage;
+    document.getElementById('prevPage').disabled = currentPage === 1;
+    document.getElementById('nextPage').disabled = start + itemsPerPage >= datosFiltrados.length;
+    
+    document.querySelectorAll('.ver-ficha-asistencia').forEach(btn => {
+        btn.addEventListener('click', (e) => { e.stopPropagation(); mostrarFichaAlumno(btn.getAttribute('data-id')); });
+    });
+}
+
+/**
+ * Filtra personas según búsqueda y filtro de rol
+ * @returns {Array} Personas filtradas
+ */
+function filtrarPersonas() {
+    const searchInput = document.getElementById('searchInput');
+    const termino = searchInput?.value.toLowerCase() || '';
+    let filtradas = listaPersonas;
+    if (filtroActual !== 'todos') filtradas = filtradas.filter(p => p.rol === filtroActual);
+    if (termino) filtradas = filtradas.filter(p => 
+        p.nombre.toLowerCase().includes(termino) || p.apellido.toLowerCase().includes(termino) ||
+        (p.tarjeta_id && p.tarjeta_id.toLowerCase().includes(termino)) || (p.detalle && p.detalle.toLowerCase().includes(termino)) ||
+        (p.dni && p.dni.toLowerCase().includes(termino))
+    );
+    return filtradas;
+}
 
 function mostrarFichaAlumno(personaId) {
     const persona = listaPersonas.find(p => p.tarjeta_id === personaId || p.id === personaId);
     if (!persona) return;
-    
     personaActualFicha = persona;
     
     document.getElementById('fichaNombreCompleto').textContent = `${persona.nombre} ${persona.apellido}`;
@@ -221,365 +586,225 @@ function mostrarFichaAlumno(personaId) {
     document.getElementById('fichaEstado').textContent = persona.estado || 'Presente';
     document.getElementById('fichaEstado').className = `status ${(persona.estado || 'Presente') === 'Presente' ? 'active' : 'inactive'}`;
     document.getElementById('fichaFechaRegistro').textContent = persona.fecha_registro ? new Date(persona.fecha_registro).toLocaleDateString() : '-';
-    
-    const fotoImg = document.getElementById('fichaFoto');
-    if (persona.foto) {
-        fotoImg.src = persona.foto;
-    } else {
-        fotoImg.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23bdc3c7'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E";
-    }
+    document.getElementById('fichaFoto').src = persona.foto || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23bdc3c7'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E";
     
     mostrarModal('fichaAlumnoModal');
 }
 
-function cambiarEstadoFicha() {
-    if (!personaActualFicha) return;
+function actualizarEstadisticasRapidas() {
+    document.getElementById('totalPersonas').textContent = listaPersonas.length;
+    document.getElementById('totalAlumnos').textContent = listaPersonas.filter(p => p.rol === 'alumno').length;
+    document.getElementById('totalProfesores').textContent = listaPersonas.filter(p => p.rol === 'profesor').length;
+    document.getElementById('totalActivos').textContent = listaPersonas.filter(p => p.estado === 'Presente').length;
+}
+
+// ==================== GESTIÓN DE CURSOS ====================
+
+function cargarTablaCursos(filtro = 'todos') {
+    const tbody = document.getElementById('cursosTableBody');
+    if (!tbody) return;
     
-    const nuevoEstado = personaActualFicha.estado === 'Presente' ? 'Ausente' : 'Presente';
-    mostrarConfirmacion(`¿Cambiar estado de ${personaActualFicha.nombre} ${personaActualFicha.apellido} a "${nuevoEstado}"?`, () => {
-        personaActualFicha.estado = nuevoEstado;
-        guardarPersonas();
-        cargarTablaPersonasPrincipal();
-        cargarTablaPersonasSimplificada();
-        actualizarEstadisticasRapidas();
-        if (usuarioActual && usuarioActual.cargo === 'directivo') {
-            cargarEstadisticasDetalladas();
-        }
-        mostrarFichaAlumno(personaActualFicha.tarjeta_id);
-        mostrarNotificacion(`Estado cambiado a ${nuevoEstado}`, 'success');
+    let cursosFiltrados = listaCursos;
+    if (filtro !== 'todos') cursosFiltrados = listaCursos.filter(c => c.anio.toString() === filtro);
+    
+    if (cursosFiltrados.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align: center;">No hay cursos registrados</td></tr>';
+        return;
+    }
+    
+    tbody.innerHTML = cursosFiltrados.map(curso => {
+        const cantidad = listaPersonas.filter(p => p.rol === 'alumno' && p.detalle === `${curso.anio}° ${curso.division}`).length;
+        return `
+            <tr class="clickable-row" data-id="${curso.id}">
+                <td>${curso.anio}° Año</td>
+                <td>${curso.division}ra División</td>
+                <td>${cantidad} alumno${cantidad !== 1 ? 's' : ''}</td>
+                <td>
+                    <button class="btn-icon eliminar-curso" data-id="${curso.id}"><i class="fas fa-trash"></i></button>
+                    <button class="btn-icon ver-alumnos" data-id="${curso.id}"><i class="fas fa-users"></i></button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+    
+    document.querySelectorAll('.eliminar-curso').forEach(btn => {
+        btn.addEventListener('click', (e) => { e.stopPropagation(); eliminarCurso(btn.getAttribute('data-id')); });
+    });
+    document.querySelectorAll('.ver-alumnos').forEach(btn => {
+        btn.addEventListener('click', (e) => { e.stopPropagation(); verAlumnosDelCurso(btn.getAttribute('data-id')); });
     });
 }
 
-function editarFicha() {
-    if (!personaActualFicha) return;
-    cerrarModal('fichaAlumnoModal');
-    // Aquí se podría abrir un modal de edición
-    mostrarNotificacion('Funcionalidad de edición en desarrollo', 'info');
-}
-
-function eliminarFicha() {
-    if (!personaActualFicha) return;
-    mostrarConfirmacion(`¿Eliminar permanentemente a ${personaActualFicha.nombre} ${personaActualFicha.apellido}?`, () => {
-        listaPersonas = listaPersonas.filter(p => p.tarjeta_id !== personaActualFicha.tarjeta_id);
-        guardarPersonas();
-        cargarTablaPersonasPrincipal();
-        cargarTablaPersonasSimplificada();
-        actualizarEstadisticasRapidas();
-        if (usuarioActual && usuarioActual.cargo === 'directivo') {
-            cargarEstadisticasDetalladas();
-        }
-        cerrarModal('fichaAlumnoModal');
-        mostrarNotificacion('Persona eliminada correctamente', 'success');
+function eliminarCurso(id) {
+    mostrarConfirmacion('¿Eliminar este curso?', () => {
+        listaCursos = listaCursos.filter(c => c.id !== id);
+        guardarCursos();
+        cargarTablaCursos();
+        mostrarNotificacion('Curso eliminado', 'success');
     });
 }
 
-// ==================== FUNCIONES DE INICIALIZACIÓN ====================
-
-function cargarDatosIniciales() {
-    const personasGuardadas = localStorage.getItem('personas');
-    if (personasGuardadas) {
-        listaPersonas = JSON.parse(personasGuardadas);
-    } else {
-        listaPersonas = [
-            { 
-                tarjeta_id: 'A1B2C3D4', 
-                nombre: 'Ana', 
-                apellido: 'García', 
-                dni: '12345678',
-                rol: 'alumno', 
-                detalle: '4° A',
-                estado: 'Presente',
-                fecha_registro: new Date().toISOString(),
-                foto: null
-            },
-            { 
-                tarjeta_id: 'E5F6G7H8', 
-                nombre: 'Carlos', 
-                apellido: 'López', 
-                dni: '87654321',
-                rol: 'profesor', 
-                detalle: 'Matemáticas',
-                estado: 'Presente',
-                fecha_registro: new Date().toISOString(),
-                foto: null
-            },
-            { 
-                tarjeta_id: 'I9J0K1L2', 
-                nombre: 'María', 
-                apellido: 'Rodríguez', 
-                dni: '11223344',
-                rol: 'alumno', 
-                detalle: '3° C',
-                estado: 'Ausente',
-                fecha_registro: new Date().toISOString(),
-                foto: null
-            },
-            { 
-                tarjeta_id: 'M3N4O5P6', 
-                nombre: 'Juan', 
-                apellido: 'Pérez', 
-                dni: '44332211',
-                rol: 'directivo', 
-                detalle: 'Director',
-                estado: 'Presente',
-                fecha_registro: new Date().toISOString(),
-                foto: null
-            }
-        ];
-        guardarPersonas();
-    }
-
-    const usuariosGuardados = localStorage.getItem('usuarios');
-    if (usuariosGuardados) {
-        listaUsuarios = JSON.parse(usuariosGuardados);
-    } else {
-        listaUsuarios = [
-            {
-                usuario: 'admin',
-                contrasena: '1234',
-                cargo: 'directivo',
-                activo: true,
-                nombre: 'Administrador',
-                foto: null,
-                fechaCreacion: new Date().toISOString()
-            },
-            {
-                usuario: 'profesor1',
-                contrasena: '1234',
-                cargo: 'profesor',
-                activo: true,
-                nombre: 'Profesor Demo',
-                foto: null,
-                fechaCreacion: new Date().toISOString()
-            }
-        ];
-        localStorage.setItem('usuarios', JSON.stringify(listaUsuarios));
-    }
-
-    const cursosGuardados = localStorage.getItem('cursos');
-    if (cursosGuardados) {
-        listaCursos = JSON.parse(cursosGuardados);
-    } else {
-        listaCursos = [];
-    }
-
-    const configGuardada = localStorage.getItem('configuracion');
-    if (configGuardada) {
-        configuracionSistema = JSON.parse(configGuardada);
-    }
-
-    const usuarioActualGuardado = localStorage.getItem('usuarioActual');
-    if (usuarioActualGuardado) {
-        usuarioActual = JSON.parse(usuarioActualGuardado);
-        actualizarVisibilidadPorRol();
-    }
-}
-
-function guardarPersonas() {
-    localStorage.setItem('personas', JSON.stringify(listaPersonas));
-}
-
-function guardarCursos() {
-    localStorage.setItem('cursos', JSON.stringify(listaCursos));
-}
-
-function guardarConfiguracionSistema() {
-    localStorage.setItem('configuracion', JSON.stringify(configuracionSistema));
-}
-
-function aplicarConfiguracion() {
-    document.body.classList.remove('tema-default', 'tema-dark', 'tema-light');
-    document.body.classList.add(`tema-${configuracionSistema.tema}`);
-
-    if (configuracionSistema.autoSave) {
-        window.addEventListener('beforeunload', guardarDatosAutomaticamente);
-    } else {
-        window.removeEventListener('beforeunload', guardarDatosAutomaticamente);
-    }
-}
-
-function guardarDatosAutomaticamente() {
-    if (configuracionSistema.autoSave) {
-        localStorage.setItem('personas', JSON.stringify(listaPersonas));
-        localStorage.setItem('usuarios', JSON.stringify(listaUsuarios));
-        localStorage.setItem('cursos', JSON.stringify(listaCursos));
-        localStorage.setItem('configuracion', JSON.stringify(configuracionSistema));
-    }
-}
-
-// ==================== CONTROL DE VISIBILIDAD POR ROL ====================
-
-function actualizarVisibilidadPorRol() {
-    const navEstadisticas = document.getElementById('navEstadisticas');
-    const userInfo = document.getElementById('userInfo');
-    const userNameSpan = document.getElementById('userName');
-    const userRoleSpan = document.getElementById('userRole');
-    const sidebarUserName = document.getElementById('sidebarUserName');
-    const sidebarUserRole = document.getElementById('sidebarUserRole');
-    const sidebarUserCourse = document.getElementById('sidebarUserCourse');
-    const userAvatarSidebar = document.getElementById('userAvatarSidebar');
-    const headerAvatar = document.getElementById('headerAvatar');
+function verAlumnosDelCurso(cursoId) {
+    const curso = listaCursos.find(c => c.id === cursoId);
+    if (!curso) return;
+    document.getElementById('cursoTitulo').textContent = `${curso.anio}° Año ${curso.division}ra División`;
     
-    if (usuarioActual) {
-        const usuarioData = listaUsuarios.find(u => u.usuario === usuarioActual.usuario);
-        
-        if (userInfo) userInfo.style.display = 'flex';
-        if (userNameSpan) userNameSpan.textContent = usuarioActual.usuario;
-        if (userRoleSpan) userRoleSpan.textContent = usuarioActual.cargo === 'directivo' ? 'Directivo' : (usuarioActual.cargo === 'profesor' ? 'Profesor' : 'Preceptor');
-        if (sidebarUserName) sidebarUserName.textContent = usuarioData?.nombre || usuarioActual.usuario;
-        if (sidebarUserRole) sidebarUserRole.textContent = usuarioActual.cargo === 'directivo' ? 'Directivo' : (usuarioActual.cargo === 'profesor' ? 'Profesor' : 'Preceptor');
-        if (sidebarUserCourse) sidebarUserCourse.textContent = usuarioData?.detalle || '';
-        
-        if (userAvatarSidebar) {
-            userAvatarSidebar.innerHTML = usuarioData?.foto ? 
-                `<img src="${usuarioData.foto}" alt="Foto">` : 
-                `<i class="fas fa-user-circle"></i>`;
-        }
-        
-        if (headerAvatar) {
-            headerAvatar.innerHTML = usuarioData?.foto ? 
-                `<img src="${usuarioData.foto}" alt="Foto">` : 
-                `<i class="fas fa-user-circle"></i>`;
-        }
-        
-        if (navEstadisticas) {
-            if (usuarioActual.cargo === 'directivo') {
-                navEstadisticas.style.display = 'block';
-                navEstadisticas.classList.remove('nav-item-oculto');
-            } else {
-                navEstadisticas.style.display = 'none';
-                navEstadisticas.classList.add('nav-item-oculto');
-                
-                const seccionEstadisticas = document.getElementById('estadisticas');
-                if (seccionEstadisticas && seccionEstadisticas.classList.contains('active')) {
-                    document.querySelector('.nav-link[data-section="home"]').click();
+    const alumnos = listaPersonas.filter(p => p.rol === 'alumno' && p.detalle === `${curso.anio}° ${curso.division}`);
+    const tbody = document.getElementById('alumnosCursoTableBody');
+    
+    if (alumnos.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center;">No hay alumnos en este curso</td></tr>';
+    } else {
+        tbody.innerHTML = alumnos.map(a => `
+            <tr class="clickable-row" data-id="${a.tarjeta_id}">
+                <td>${a.foto ? `<img src="${a.foto}" class="alumno-thumb">` : '<i class="fas fa-user-circle" style="font-size: 35px;"></i>'}</td>
+                <td>${a.nombre}</td>
+                <td>${a.apellido}</td>
+                <td>${a.dni || '-'}</td>
+                <td><button class="btn-icon ver-ficha" data-id="${a.tarjeta_id}"><i class="fas fa-id-card"></i> Ver Ficha</button></td>
+            </tr>
+        `).join('');
+    }
+    
+    document.querySelectorAll('.ver-ficha').forEach(btn => {
+        btn.addEventListener('click', () => mostrarFichaAlumno(btn.getAttribute('data-id')));
+    });
+    mostrarModal('alumnosCursoModal');
+}
+
+// ==================== GESTIÓN DE USUARIOS ====================
+
+function cargarTablaUsuariosGestion() {
+    const tbody = document.getElementById('usuariosGestionTableBody');
+    if (!tbody) return;
+    
+    if (listaUsuarios.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align: center;">No hay usuarios registrados</td></tr>';
+        return;
+    }
+    
+    tbody.innerHTML = listaUsuarios.map(usuario => {
+        const persona = listaPersonas.find(p => p.id === usuario.id_persona || p.tarjeta_id === usuario.id_persona);
+        return `
+            <tr>
+                <td>${usuario.usuario}</td>
+                <td>${persona ? `${persona.nombre} ${persona.apellido}` : 'No asociado'}</td>
+                <td><span class="rol-badge ${usuario.rol}">${usuario.rol}</span></td>
+                <td><span class="status ${usuario.activo ? 'active' : 'inactive'}">${usuario.activo ? 'Activo' : 'Inactivo'}</span></td>
+                <td>${new Date(usuario.fechaCreacion).toLocaleDateString()}</td>
+                <td>
+                    <button class="btn-icon reset-pass" data-usuario="${usuario.usuario}"><i class="fas fa-key"></i></button>
+                    <button class="btn-icon eliminar-usuario-gestion" data-usuario="${usuario.usuario}"><i class="fas fa-trash"></i></button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+    
+    document.querySelectorAll('.reset-pass').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const usuario = btn.getAttribute('data-usuario');
+            const nuevaPass = prompt('Nueva contraseña para ' + usuario);
+            if (nuevaPass && nuevaPass.length >= 4) {
+                const user = listaUsuarios.find(u => u.usuario === usuario);
+                if (user) {
+                    user.contrasena = nuevaPass;
+                    localStorage.setItem('usuarios', JSON.stringify(listaUsuarios));
+                    mostrarNotificacion('Contraseña actualizada', 'success');
                 }
+            } else if (nuevaPass) {
+                mostrarNotificacion('La contraseña debe tener al menos 4 caracteres', 'warning');
             }
-        }
-        
-        const btnGestionUsuarios = document.getElementById('btnGestionUsuarios');
-        const btnConfiguracion = document.getElementById('btnConfiguracion');
-        
-        if (usuarioActual.cargo !== 'directivo') {
-            if (btnGestionUsuarios) btnGestionUsuarios.style.display = 'none';
-            if (btnConfiguracion) btnConfiguracion.style.display = 'none';
-        } else {
-            if (btnGestionUsuarios) btnGestionUsuarios.style.display = 'inline-flex';
-            if (btnConfiguracion) btnConfiguracion.style.display = 'inline-flex';
-        }
-    } else {
-        if (userInfo) userInfo.style.display = 'none';
-        if (navEstadisticas) navEstadisticas.style.display = 'none';
-        if (sidebarUserName) sidebarUserName.textContent = 'Invitado';
-        if (sidebarUserRole) sidebarUserRole.textContent = '';
-        if (sidebarUserCourse) sidebarUserCourse.textContent = '';
-        if (userAvatarSidebar) userAvatarSidebar.innerHTML = '<i class="fas fa-user-circle"></i>';
-    }
+        });
+    });
+    
+    document.querySelectorAll('.eliminar-usuario-gestion').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const usuario = btn.getAttribute('data-usuario');
+            mostrarConfirmacion(`¿Eliminar usuario ${usuario}?`, () => {
+                listaUsuarios = listaUsuarios.filter(u => u.usuario !== usuario);
+                localStorage.setItem('usuarios', JSON.stringify(listaUsuarios));
+                cargarTablaUsuariosGestion();
+                mostrarNotificacion('Usuario eliminado', 'success');
+            });
+        });
+    });
 }
 
-// ==================== FUNCIONES DE ESTADÍSTICAS DETALLADAS ====================
+function cargarSelectPersonas() {
+    const select = document.getElementById('selectPersona');
+    if (!select) return;
+    select.innerHTML = '<option value="">Seleccionar persona...</option>' + 
+        listaPersonas.map(p => `<option value="${p.id || p.tarjeta_id}">${p.nombre} ${p.apellido} - ${p.rol}</option>`).join('');
+}
+
+function asociarUsuarioAPersona(usuario, contrasena, rol, idPersona) {
+    if (listaUsuarios.find(u => u.usuario === usuario)) {
+        mostrarNotificacion('El nombre de usuario ya existe', 'error');
+        return false;
+    }
+    
+    const nuevoUsuario = {
+        usuario,
+        contrasena,
+        rol,
+        id_persona: idPersona,
+        activo: true,
+        fechaCreacion: new Date().toISOString()
+    };
+    listaUsuarios.push(nuevoUsuario);
+    localStorage.setItem('usuarios', JSON.stringify(listaUsuarios));
+    return true;
+}
+
+// ==================== ESTADÍSTICAS ====================
 
 function cargarEstadisticasDetalladas() {
-    if (!usuarioActual || usuarioActual.cargo !== 'directivo') return;
-    
     const total = listaPersonas.length;
+    if (total === 0) {
+        document.getElementById('statAlumnosDetallado').textContent = '0';
+        document.getElementById('statProfesoresDetallado').textContent = '0';
+        document.getElementById('statPreceptoresDetallado').textContent = '0';
+        document.getElementById('statDirectivosDetallado').textContent = '0';
+        return;
+    }
+    
     const alumnos = listaPersonas.filter(p => p.rol === 'alumno').length;
     const profesores = listaPersonas.filter(p => p.rol === 'profesor').length;
     const preceptores = listaPersonas.filter(p => p.rol === 'preceptor').length;
     const directivos = listaPersonas.filter(p => p.rol === 'directivo').length;
     const presentes = listaPersonas.filter(p => p.estado === 'Presente').length;
     const ausentes = listaPersonas.filter(p => p.estado === 'Ausente').length;
-    const tarjetasAsignadas = listaPersonas.filter(p => p.tarjeta_id && p.tarjeta_id !== '').length;
     
     document.getElementById('statAlumnosDetallado').textContent = alumnos;
     document.getElementById('statProfesoresDetallado').textContent = profesores;
     document.getElementById('statPreceptoresDetallado').textContent = preceptores;
     document.getElementById('statDirectivosDetallado').textContent = directivos;
-    
-    actualizarCirculoEstadistico('.circle-alumnos', (alumnos / total) * 100);
-    actualizarCirculoEstadistico('.circle-profesores', (profesores / total) * 100);
-    actualizarCirculoEstadistico('.circle-preceptores', (preceptores / total) * 100);
-    actualizarCirculoEstadistico('.circle-directivos', (directivos / total) * 100);
-    
     document.getElementById('totalPersonasDetallado').textContent = total;
     document.getElementById('totalPresentesDetallado').textContent = presentes;
     document.getElementById('totalAusentesDetallado').textContent = ausentes;
-    document.getElementById('totalTarjetasAsignadas').textContent = tarjetasAsignadas;
+    document.getElementById('totalTarjetasAsignadas').textContent = listaPersonas.filter(p => p.tarjeta_id).length;
     document.getElementById('totalCursosActivos').textContent = listaCursos.length;
     
-    let totalAlumnosEnCursos = 0;
-    listaCursos.forEach(curso => {
-        const alumnosEnCurso = listaPersonas.filter(p => 
-            p.rol === 'alumno' && 
-            p.detalle === `${curso.anio}° ${curso.division}`
-        ).length;
-        totalAlumnosEnCursos += alumnosEnCurso;
-    });
-    const promedio = listaCursos.length > 0 ? (totalAlumnosEnCursos / listaCursos.length).toFixed(1) : 0;
-    document.getElementById('promedioAlumnosPorCurso').textContent = promedio;
-    
-    cargarAsistenciaPorCurso();
-}
-
-function cargarAsistenciaPorCurso() {
-    const tbody = document.getElementById('asistenciaPorCursoBody');
-    if (!tbody) return;
-    
-    tbody.innerHTML = '';
-    
-    listaCursos.forEach(curso => {
-        const alumnosDelCurso = listaPersonas.filter(p => 
-            p.rol === 'alumno' && 
-            p.detalle === `${curso.anio}° ${curso.division}`
-        );
-        
-        const totalAlumnos = alumnosDelCurso.length;
-        const presentes = alumnosDelCurso.filter(p => p.estado === 'Presente').length;
-        const ausentes = totalAlumnos - presentes;
-        const porcentaje = totalAlumnos > 0 ? ((presentes / totalAlumnos) * 100).toFixed(1) : 0;
-        
-        let porcentajeClase = '';
-        if (porcentaje >= 75) porcentajeClase = 'high';
-        else if (porcentaje >= 50) porcentajeClase = 'medium';
-        else porcentajeClase = 'low';
-        
-        const fila = document.createElement('tr');
-        fila.innerHTML = `
-            <td><strong>${curso.anio}° ${curso.division}ra</strong></td>
-            <td>${totalAlumnos}</td>
-            <td>${presentes}</td>
-            <td>${ausentes}</td>
-            <td>
-                <span class="percentage-badge ${porcentajeClase}">${porcentaje}%</span>
-                <div class="progress-bar">
-                    <div class="progress-fill" style="width: ${porcentaje}%"></div>
-                </div>
-            </td>
-        `;
-        tbody.appendChild(fila);
-    });
-    
-    if (listaCursos.length === 0) {
-        const fila = document.createElement('tr');
-        fila.innerHTML = '<td colspan="5" class="text-center">No hay cursos registrados</td>';
-        tbody.appendChild(fila);
-    }
-}
-
-function actualizarCirculoEstadistico(selector, porcentaje) {
-    const circulo = document.querySelector(selector);
-    if (!circulo) return;
-    
-    const texto = circulo.parentElement.querySelector('.percentage');
     const circunferencia = 2 * Math.PI * 15.9155;
-    const dashArray = `${(porcentaje / 100) * circunferencia}, ${circunferencia}`;
+    const circleAlumnos = document.querySelector('.circle-alumnos');
+    const circleProfesores = document.querySelector('.circle-profesores');
+    const circlePreceptores = document.querySelector('.circle-preceptores');
+    const circleDirectivos = document.querySelector('.circle-directivos');
     
-    circulo.style.strokeDasharray = dashArray;
-    if (texto) texto.textContent = `${Math.round(porcentaje)}%`;
+    if (circleAlumnos) circleAlumnos.setAttribute('stroke-dasharray', `${(alumnos / total) * circunferencia}, ${circunferencia}`);
+    if (circleProfesores) circleProfesores.setAttribute('stroke-dasharray', `${(profesores / total) * circunferencia}, ${circunferencia}`);
+    if (circlePreceptores) circlePreceptores.setAttribute('stroke-dasharray', `${(preceptores / total) * circunferencia}, ${circunferencia}`);
+    if (circleDirectivos) circleDirectivos.setAttribute('stroke-dasharray', `${(directivos / total) * circunferencia}, ${circunferencia}`);
+    
+    const percentages = document.querySelectorAll('.percentage');
+    const valores = [alumnos, profesores, preceptores, directivos];
+    percentages.forEach((el, i) => {
+        if (el) el.textContent = `${Math.round((valores[i] / total) * 100)}%`;
+    });
 }
 
 function exportarEstadisticasAExcel() {
-    if (!usuarioActual || usuarioActual.cargo !== 'directivo') return;
+    if (!usuarioActual || usuarioActual.rol !== 'directivo') return;
     
     const resumen = [
         ['RESUMEN GENERAL DEL SISTEMA'],
@@ -591,494 +816,144 @@ function exportarEstadisticasAExcel() {
         ['Directivos', listaPersonas.filter(p => p.rol === 'directivo').length],
         ['Presentes', listaPersonas.filter(p => p.estado === 'Presente').length],
         ['Ausentes', listaPersonas.filter(p => p.estado === 'Ausente').length],
-        ['Tarjetas RFID Asignadas', listaPersonas.filter(p => p.tarjeta_id).length],
-        ['Cursos Activos', listaCursos.length],
-        [],
-        ['ASISTENCIA POR CURSO'],
-        ['Curso', 'Total Alumnos', 'Presentes', 'Ausentes', 'Porcentaje']
+        ['Tarjetas RFID', listaPersonas.filter(p => p.tarjeta_id).length],
+        ['Cursos Activos', listaCursos.length]
     ];
     
-    listaCursos.forEach(curso => {
-        const alumnosDelCurso = listaPersonas.filter(p => 
-            p.rol === 'alumno' && 
-            p.detalle === `${curso.anio}° ${curso.division}`
-        );
-        const total = alumnosDelCurso.length;
-        const presentes = alumnosDelCurso.filter(p => p.estado === 'Presente').length;
-        const porcentaje = total > 0 ? ((presentes / total) * 100).toFixed(1) : 0;
-        resumen.push([`${curso.anio}° ${curso.division}ra`, total, presentes, total - presentes, `${porcentaje}%`]);
-    });
-    
     let csv = '';
-    resumen.forEach(fila => {
-        csv += fila.join(',') + '\n';
-    });
+    resumen.forEach(fila => { csv += fila.join(',') + '\n'; });
     
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const enlace = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    
-    enlace.setAttribute('href', url);
-    enlace.setAttribute('download', `estadisticas_expotec_${new Date().toISOString().split('T')[0]}.csv`);
-    enlace.style.visibility = 'hidden';
-    
-    document.body.appendChild(enlace);
+    enlace.href = URL.createObjectURL(blob);
+    enlace.download = `estadisticas_expotec_${new Date().toISOString().split('T')[0]}.csv`;
     enlace.click();
-    document.body.removeChild(enlace);
     
-    mostrarNotificacion('Estadísticas exportadas exitosamente', 'success');
+    mostrarNotificacion('Estadísticas exportadas', 'success');
 }
 
 function imprimirEstadisticas() {
-    if (!usuarioActual || usuarioActual.cargo !== 'directivo') return;
-    
-    const seccionEstadisticas = document.getElementById('estadisticas');
-    if (!seccionEstadisticas) return;
-    
-    const ventana = window.open('', '_blank');
-    ventana.document.write(`
-        <html>
-            <head>
-                <title>Reporte de Estadísticas - Expotec 2026</title>
-                <style>
-                    body { font-family: Arial, sans-serif; margin: 40px; }
-                    h1 { color: #2c3e50; text-align: center; }
-                    h2 { color: #3498db; margin-top: 30px; }
-                    table { width: 100%; border-collapse: collapse; margin: 20px 0; }
-                    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-                    th { background-color: #f2f2f2; }
-                    .header { text-align: center; margin-bottom: 30px; }
-                    .footer { text-align: center; margin-top: 50px; font-size: 12px; color: #666; }
-                </style>
-            </head>
-            <body>
-                <div class="header">
-                    <h1>Expotec 2026 - Reporte de Estadísticas</h1>
-                    <p>Fecha de generación: ${new Date().toLocaleString()}</p>
-                    <p>Generado por: ${usuarioActual.usuario} (${usuarioActual.cargo})</p>
-                </div>
-                ${seccionEstadisticas.innerHTML}
-                <div class="footer">
-                    <p>Este reporte es confidencial y solo para uso administrativo.</p>
-                </div>
-            </body>
-        </html>
-    `);
-    ventana.document.close();
-    ventana.print();
+    window.print();
 }
 
-// ==================== FUNCIONES PARA MODALES ====================
+// ==================== FUNCIONES DE INICIALIZACIÓN ====================
 
-function inicializarModales() {
-    document.querySelectorAll('.close-modal').forEach(boton => {
-        boton.addEventListener('click', function() {
-            const modal = this.closest('.modal');
-            if (modal && modal.id !== 'notificationModal' && modal.id !== 'confirmModal' && modal.id !== 'loadingModal') {
-                cerrarModal(modal.id);
-            }
-        });
-    });
+function guardarPersonas() { localStorage.setItem('personas', JSON.stringify(listaPersonas)); }
+function guardarCursos() { localStorage.setItem('cursos', JSON.stringify(listaCursos)); }
 
-    document.querySelectorAll('.btn-cancel').forEach(boton => {
-        boton.addEventListener('click', function() {
-            const modal = this.closest('.modal');
-            if (modal && modal.id !== 'notificationModal' && modal.id !== 'confirmModal') {
-                cerrarModal(modal.id);
-            }
-        });
-    });
-
-    document.querySelectorAll('.modal').forEach(modal => {
-        modal.addEventListener('click', function(e) {
-            if (e.target === this) {
-                if (modal.id !== 'notificationModal' && modal.id !== 'confirmModal' && modal.id !== 'loadingModal') {
-                    cerrarModal(modal.id);
-                }
-            }
-        });
-    });
-
-    document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape') {
-            document.querySelectorAll('.modal.active').forEach(modal => {
-                if (modal.id !== 'notificationModal' && modal.id !== 'confirmModal' && modal.id !== 'loadingModal') {
-                    cerrarModal(modal.id);
-                }
-            });
-        }
-    });
-    
-    const btnCambiarEstado = document.getElementById('btnCambiarEstado');
-    const btnEditarFicha = document.getElementById('btnEditarFicha');
-    const btnEliminarFicha = document.getElementById('btnEliminarFicha');
-    
-    if (btnCambiarEstado) btnCambiarEstado.addEventListener('click', cambiarEstadoFicha);
-    if (btnEditarFicha) btnEditarFicha.addEventListener('click', editarFicha);
-    if (btnEliminarFicha) btnEliminarFicha.addEventListener('click', eliminarFicha);
-}
-
-function cerrarModal(modalId) {
-    const modal = document.getElementById(modalId);
-    if (!modal) return;
-    
-    modal.classList.remove('active');
-    document.body.style.overflow = 'auto';
-    
-    const formulario = modal.querySelector('form');
-    if (formulario) formulario.reset();
-    
-    if (modalId === 'nuevoAlumnoModal') {
-        const campoDinamico = document.getElementById('campoDinamico');
-        if (campoDinamico) campoDinamico.classList.add('hidden');
-        resetearRFID();
-        fotoSeleccionada = null;
-        const previewImg = document.getElementById('previewImage');
-        if (previewImg) {
-            previewImg.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23bdc3c7'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E";
-        }
-        document.getElementById('btnEliminarFoto').style.display = 'none';
+function cargarDatosIniciales() {
+    const storedPersonas = localStorage.getItem('personas');
+    if (storedPersonas) {
+        listaPersonas = JSON.parse(storedPersonas);
+    } else {
+        listaPersonas = [
+            { id: '1', tarjeta_id: 'A1B2C3D4', nombre: 'Ana', apellido: 'García', dni: '12345678', rol: 'alumno', detalle: '4° A', estado: 'Presente', fecha_registro: new Date().toISOString(), foto: null },
+            { id: '2', tarjeta_id: 'E5F6G7H8', nombre: 'Carlos', apellido: 'López', dni: '87654321', rol: 'profesor', detalle: 'Matemáticas', estado: 'Presente', fecha_registro: new Date().toISOString(), foto: null },
+            { id: '3', tarjeta_id: 'I9J0K1L2', nombre: 'María', apellido: 'Rodríguez', dni: '11223344', rol: 'preceptor', detalle: 'Secretaría', estado: 'Presente', fecha_registro: new Date().toISOString(), foto: null },
+            { id: '4', tarjeta_id: 'M3N4O5P6', nombre: 'Juan', apellido: 'Pérez', dni: '44332211', rol: 'directivo', detalle: 'Director', estado: 'Presente', fecha_registro: new Date().toISOString(), foto: null }
+        ];
+        guardarPersonas();
     }
-}
-
-function mostrarModal(modalId) {
-    const modal = document.getElementById(modalId);
-    if (modal) {
-        modal.classList.add('active');
-        document.body.style.overflow = 'hidden';
+    
+    const storedUsuarios = localStorage.getItem('usuarios');
+    if (storedUsuarios) {
+        listaUsuarios = JSON.parse(storedUsuarios);
+    } else {
+        listaUsuarios = [
+            { usuario: 'admin', contrasena: '1234', rol: 'directivo', activo: true, fechaCreacion: new Date().toISOString() },
+            { usuario: 'profesor1', contrasena: '1234', rol: 'profesor', activo: true, fechaCreacion: new Date().toISOString() },
+            { usuario: 'preceptor1', contrasena: '1234', rol: 'preceptor', activo: true, fechaCreacion: new Date().toISOString() },
+            { usuario: 'alumno1', contrasena: '1234', rol: 'alumno', activo: true, fechaCreacion: new Date().toISOString() }
+        ];
+        localStorage.setItem('usuarios', JSON.stringify(listaUsuarios));
     }
-}
-
-// ==================== FUNCIONES PARA GESTIÓN DE CURSOS ====================
-
-function crearCurso(anio, division) {
-    const nuevoCurso = {
-        id: Date.now().toString(),
-        anio: parseInt(anio),
-        division: parseInt(division),
-        fechaCreacion: new Date().toISOString()
-    };
-    listaCursos.push(nuevoCurso);
-    guardarCursos();
-    return nuevoCurso;
-}
-
-function eliminarCurso(id) {
-    mostrarConfirmacion('¿Está seguro de que desea eliminar este curso?', () => {
-        listaCursos = listaCursos.filter(curso => curso.id !== id);
+    
+    const storedCursos = localStorage.getItem('cursos');
+    if (storedCursos) {
+        listaCursos = JSON.parse(storedCursos);
+    } else {
+        listaCursos = [
+            { id: '1', anio: 4, division: 2, fechaCreacion: new Date().toISOString() },
+            { id: '2', anio: 5, division: 1, fechaCreacion: new Date().toISOString() }
+        ];
         guardarCursos();
-        cargarTablaCursos();
-        if (usuarioActual && usuarioActual.cargo === 'directivo') {
+    }
+    
+    const storedConfig = localStorage.getItem('configuracion');
+    if (storedConfig) configuracionSistema = JSON.parse(storedConfig);
+    
+    const storedUsuario = localStorage.getItem('usuarioActual');
+    if (storedUsuario) usuarioActual = JSON.parse(storedUsuario);
+}
+
+function actualizarUIporSesion() {
+    const loginSection = document.getElementById('loginSection');
+    const userInfo = document.getElementById('userInfo');
+    const btnLoginHeader = document.getElementById('btnLoginHeader');
+    const sidebar = document.getElementById('sidebar');
+    
+    if (usuarioActual) {
+        if (loginSection) loginSection.classList.remove('active');
+        if (userInfo) userInfo.style.display = 'flex';
+        if (btnLoginHeader) btnLoginHeader.style.display = 'none';
+        
+        document.getElementById('userName').textContent = usuarioActual.usuario;
+        let rolTexto = '';
+        switch(usuarioActual.rol) {
+            case 'directivo': rolTexto = 'Directivo'; break;
+            case 'profesor': rolTexto = 'Profesor'; break;
+            case 'preceptor': rolTexto = 'Preceptor'; break;
+            case 'alumno': rolTexto = 'Alumno'; break;
+            default: rolTexto = usuarioActual.rol;
+        }
+        document.getElementById('userRole').textContent = rolTexto;
+        document.getElementById('sidebarUserName').textContent = usuarioActual.usuario;
+        document.getElementById('sidebarUserRole').textContent = rolTexto;
+        
+        renderizarSidebar();
+        
+        // Carga inicial de datos según rol
+        if (usuarioActual.rol === 'directivo') {
+            cargarTablaUsuariosGestion();
             cargarEstadisticasDetalladas();
-        }
-        mostrarNotificacion('Curso eliminado correctamente', 'success');
-    });
-}
-
-function cargarTablaCursos(filtro = 'todos') {
-    const tbody = document.getElementById('cursosTableBody');
-    if (!tbody) return;
-
-    tbody.innerHTML = '';
-    
-    let cursosFiltrados = listaCursos;
-    if (filtro !== 'todos') {
-        cursosFiltrados = listaCursos.filter(curso => curso.anio.toString() === filtro);
-    }
-
-    cursosFiltrados.forEach(curso => {
-        const cantidadAlumnos = listaPersonas.filter(persona => 
-            persona.rol === 'alumno' && 
-            persona.detalle === `${curso.anio}° ${curso.division}`
-        ).length;
-
-        const fila = document.createElement('tr');
-        fila.innerHTML = `
-            <td>${curso.anio}° Año</td>
-            <td>${curso.division}ra División</td>
-            <td>${cantidadAlumnos} alumno${cantidadAlumnos !== 1 ? 's' : ''}</td>
-            <td>
-                <button class="btn-icon" onclick="eliminarCurso('${curso.id}')">
-                    <i class="fas fa-trash"></i>
-                </button>
-                <button class="btn-icon" onclick="verAlumnosDelCurso('${curso.id}')">
-                    <i class="fas fa-users"></i>
-                </button>
-            </td>
-        `;
-        
-        fila.addEventListener('click', function(e) {
-            if (!e.target.closest('button')) {
-                verAlumnosDelCurso(curso.id);
-            }
-        });
-        fila.style.cursor = 'pointer';
-        tbody.appendChild(fila);
-    });
-}
-
-function verAlumnosDelCurso(cursoId) {
-    const curso = listaCursos.find(c => c.id === cursoId);
-    if (!curso) return;
-
-    const titulo = document.getElementById('cursoTitulo');
-    if (titulo) {
-        titulo.textContent = `${curso.anio}° Año ${curso.division}ra División`;
-    }
-
-    const alumnosDelCurso = listaPersonas.filter(persona => 
-        persona.rol === 'alumno' && 
-        persona.detalle === `${curso.anio}° ${curso.division}`
-    );
-
-    const tbody = document.getElementById('alumnosCursoTableBody');
-    if (tbody) {
-        tbody.innerHTML = '';
-        
-        if (alumnosDelCurso.length === 0) {
-            const fila = document.createElement('tr');
-            fila.innerHTML = '<td colspan="5" class="text-center">No hay alumnos asignados a este curso</td>';
-            tbody.appendChild(fila);
-        } else {
-            alumnosDelCurso.forEach(alumno => {
-                const fila = document.createElement('tr');
-                fila.className = 'clickable-row';
-                fila.innerHTML = `
-                    <td>
-                        ${alumno.foto ? 
-                            `<img src="${alumno.foto}" class="alumno-thumb" alt="Foto" style="width: 35px; height: 35px; border-radius: 50%; object-fit: cover;">` : 
-                            `<i class="fas fa-user-circle" style="font-size: 35px; color: #bdc3c7;"></i>`
-                        }
-                    </td>
-                    <td>${alumno.nombre || ''}</td>
-                    <td>${alumno.apellido || ''}</td>
-                    <td>${alumno.dni || '-'}</td>
-                    <td>
-                        <button class="btn-icon ver-ficha" data-id="${alumno.tarjeta_id}">
-                            <i class="fas fa-id-card"></i> Ver Ficha
-                        </button>
-                    </td>
-                `;
-                fila.addEventListener('click', (e) => {
-                    if (!e.target.closest('.ver-ficha')) {
-                        mostrarFichaAlumno(alumno.tarjeta_id);
-                    }
-                });
-                tbody.appendChild(fila);
-            });
-            
-            document.querySelectorAll('.ver-ficha').forEach(btn => {
-                btn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    mostrarFichaAlumno(btn.getAttribute('data-id'));
-                });
-            });
-        }
-    }
-
-    mostrarModal('alumnosCursoModal');
-}
-
-// ==================== FUNCIONES PARA GESTIÓN DE PERSONAS ====================
-
-function cargarTablaPersonasSimplificada(filtro = 'todos') {
-    const tbody = document.getElementById('personasTableBody_personas');
-    if (!tbody) return;
-
-    tbody.innerHTML = '';
-    
-    let personasFiltradas = listaPersonas;
-    if (filtro !== 'todos') {
-        personasFiltradas = listaPersonas.filter(persona => persona.rol === filtro);
-    }
-
-    personasFiltradas.forEach(persona => {
-        const fila = document.createElement('tr');
-        fila.className = 'clickable-row';
-        fila.innerHTML = `
-            <td>
-                ${persona.foto ? 
-                    `<img src="${persona.foto}" class="user-thumb" alt="Foto" style="width: 35px; height: 35px; border-radius: 50%; object-fit: cover;">` : 
-                    `<i class="fas fa-user-circle" style="font-size: 35px; color: #bdc3c7;"></i>`
-                }
-            </td>
-            <td>${persona.tarjeta_id || persona.id || '-'}</td>
-            <td>${persona.nombre}</td>
-            <td>${persona.apellido}</td>
-            <td><span class="rol-badge ${persona.rol}">${persona.rol}</span></td>
-            <td>${persona.detalle || '-'}</td>
-            <td>
-                <button class="btn-icon ver-ficha-persona" data-id="${persona.tarjeta_id || persona.id}">
-                    <i class="fas fa-id-card"></i> Ver Ficha
-                </button>
-                <button class="btn-icon" onclick="editarPersona('${persona.tarjeta_id || persona.id}')">
-                    <i class="fas fa-edit"></i>
-                </button>
-                <button class="btn-icon" onclick="eliminarPersonaPorId('${persona.tarjeta_id || persona.id}')">
-                    <i class="fas fa-trash"></i>
-                </button>
-            </td>
-        `;
-        fila.addEventListener('click', (e) => {
-            if (!e.target.closest('.ver-ficha-persona') && !e.target.closest('.btn-icon')) {
-                mostrarFichaAlumno(persona.tarjeta_id || persona.id);
-            }
-        });
-        tbody.appendChild(fila);
-    });
-    
-    document.querySelectorAll('.ver-ficha-persona').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            mostrarFichaAlumno(btn.getAttribute('data-id'));
-        });
-    });
-}
-
-function cargarTablaPersonasPrincipal() {
-    const tbody = document.getElementById('personasTableBody_asistencias');
-    if (!tbody) return;
-    
-    const datosFiltrados = filtrarPersonas();
-    
-    tbody.innerHTML = '';
-    
-    datosFiltrados.forEach(persona => {
-        const fila = document.createElement('tr');
-        fila.className = 'clickable-row';
-        fila.innerHTML = `
-            <td>
-                ${persona.foto ? 
-                    `<img src="${persona.foto}" class="user-thumb" alt="Foto" style="width: 35px; height: 35px; border-radius: 50%; object-fit: cover;">` : 
-                    `<i class="fas fa-user-circle" style="font-size: 35px; color: #bdc3c7;"></i>`
-                }
-            </td>
-            <td><strong>${persona.tarjeta_id || 'No asignado'}</strong></td>
-            <td>${persona.nombre}</td>
-            <td>${persona.apellido}</td>
-            <td><span class="rol-badge ${persona.rol}">${persona.rol}</span></td>
-            <td>${persona.detalle || '-'}</td>
-            <td><span class="status ${persona.estado === 'Presente' ? 'active' : 'inactive'}">${persona.estado}</span></td>
-            <td>${new Date(persona.fecha_registro).toLocaleDateString()}</td>
-            <td>
-                <button class="btn-icon ver-ficha-asistencia" data-id="${persona.tarjeta_id}">
-                    <i class="fas fa-id-card"></i>
-                </button>
-                <button class="btn-icon editar-persona" data-id="${persona.tarjeta_id}">
-                    <i class="fas fa-edit"></i>
-                </button>
-                <button class="btn-icon eliminar-persona" data-id="${persona.tarjeta_id}">
-                    <i class="fas fa-trash"></i>
-                </button>
-            </td>
-        `;
-        fila.addEventListener('click', (e) => {
-            if (!e.target.closest('.ver-ficha-asistencia') && !e.target.closest('.editar-persona') && !e.target.closest('.eliminar-persona')) {
-                mostrarFichaAlumno(persona.tarjeta_id);
-            }
-        });
-        tbody.appendChild(fila);
-    });
-    
-    const personasCountEl = document.getElementById('personasCount');
-    const totalCountEl = document.getElementById('totalCount');
-    
-    if (personasCountEl) personasCountEl.textContent = datosFiltrados.length;
-    if (totalCountEl) totalCountEl.textContent = listaPersonas.length;
-    
-    document.querySelectorAll('.ver-ficha-asistencia').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            mostrarFichaAlumno(btn.getAttribute('data-id'));
-        });
-    });
-    
-    agregarEventListenersAcciones();
-}
-
-function filtrarPersonas() {
-    const searchInput = document.getElementById('searchInput');
-    if (!searchInput) return listaPersonas;
-    
-    const terminoBusqueda = searchInput.value.toLowerCase();
-    let filtradas = listaPersonas;
-    
-    if (filtroActual !== 'todos') {
-        filtradas = filtradas.filter(p => p.rol === filtroActual);
-    }
-    
-    if (terminoBusqueda) {
-        filtradas = filtradas.filter(p => 
-            p.nombre.toLowerCase().includes(terminoBusqueda) ||
-            p.apellido.toLowerCase().includes(terminoBusqueda) ||
-            (p.tarjeta_id && p.tarjeta_id.toLowerCase().includes(terminoBusqueda)) ||
-            (p.detalle && p.detalle.toLowerCase().includes(terminoBusqueda)) ||
-            (p.dni && p.dni.toLowerCase().includes(terminoBusqueda))
-        );
-    }
-    
-    return filtradas;
-}
-
-function agregarEventListenersAcciones() {
-    document.querySelectorAll('.editar-persona').forEach(boton => {
-        boton.addEventListener('click', function(e) {
-            e.stopPropagation();
-            if (!verificarPermiso('editar_personas')) return;
-            const tarjetaId = this.getAttribute('data-id');
-            editarPersona(tarjetaId);
-        });
-    });
-    
-    document.querySelectorAll('.eliminar-persona').forEach(boton => {
-        boton.addEventListener('click', function(e) {
-            e.stopPropagation();
-            if (!verificarPermiso('eliminar_personas')) return;
-            const tarjetaId = this.getAttribute('data-id');
-            eliminarPersonaPorId(tarjetaId);
-        });
-    });
-}
-
-function editarPersona(tarjetaId) {
-    const persona = listaPersonas.find(p => p.tarjeta_id === tarjetaId);
-    if (persona) {
-        mostrarNotificacion(`Editar persona: ${persona.nombre} ${persona.apellido}\n\nEsta funcionalidad está en desarrollo.`, 'info', 'En desarrollo');
-    }
-}
-
-function eliminarPersonaPorId(tarjetaId) {
-    const persona = listaPersonas.find(p => p.tarjeta_id === tarjetaId);
-    if (persona) {
-        mostrarConfirmacion(`¿Estás seguro de eliminar a ${persona.nombre} ${persona.apellido}?`, () => {
-            listaPersonas = listaPersonas.filter(p => p.tarjeta_id !== tarjetaId);
-            guardarPersonas();
-            cargarTablaPersonasPrincipal();
             cargarTablaPersonasSimplificada();
+            cargarTablaCursos();
+            cargarTablaPersonasPrincipal();
             actualizarEstadisticasRapidas();
-            if (usuarioActual && usuarioActual.cargo === 'directivo') {
-                cargarEstadisticasDetalladas();
-            }
-            mostrarNotificacion('Persona eliminada correctamente', 'success');
-        });
+        } else if (usuarioActual.rol === 'preceptor') {
+            cargarTablaPersonasSimplificada();
+            cargarTablaCursos();
+            cargarTablaPersonasPrincipal();
+            actualizarEstadisticasRapidas();
+        } else if (usuarioActual.rol === 'profesor') {
+            cargarTablaPersonasPrincipal();
+            actualizarEstadisticasRapidas();
+        }
+        
+        cargarAnuncios();
+        
+        const puedeGestionarPersonas = (usuarioActual.rol === 'directivo' || usuarioActual.rol === 'preceptor');
+        const btnNuevaPersona = document.getElementById('btnNuevaPersona');
+        const nuevaPersonaBtn = document.getElementById('nuevaPersonaBtn');
+        if (btnNuevaPersona) btnNuevaPersona.style.display = puedeGestionarPersonas ? 'inline-flex' : 'none';
+        if (nuevaPersonaBtn) nuevaPersonaBtn.style.display = puedeGestionarPersonas ? 'inline-flex' : 'none';
+        
+        const btnCrearAnuncioContainer = document.getElementById('btnCrearAnuncioContainer');
+        if (btnCrearAnuncioContainer) {
+            btnCrearAnuncioContainer.style.display = (usuarioActual.rol === 'directivo' || usuarioActual.rol === 'preceptor') ? 'block' : 'none';
+        }
+        
+    } else {
+        if (loginSection) loginSection.classList.add('active');
+        if (userInfo) userInfo.style.display = 'none';
+        if (btnLoginHeader) btnLoginHeader.style.display = 'flex';
+        if (sidebar) sidebar.classList.remove('active');
+        
+        const sidebarMenu = document.getElementById('sidebarMenu');
+        if (sidebarMenu) {
+            sidebarMenu.innerHTML = '<li style="padding: 1rem; text-align: center; color: rgba(255,255,255,0.5);">Inicie sesión para continuar</li>';
+        }
     }
-}
-
-function actualizarEstadisticasRapidas() {
-    const total = listaPersonas.length;
-    const alumnos = listaPersonas.filter(p => p.rol === 'alumno').length;
-    const profesores = listaPersonas.filter(p => p.rol === 'profesor').length;
-    const presentes = listaPersonas.filter(p => p.estado === 'Presente').length;
-    
-    const totalPersonasEl = document.getElementById('totalPersonas');
-    const totalAlumnosEl = document.getElementById('totalAlumnos');
-    const totalProfesoresEl = document.getElementById('totalProfesores');
-    const totalActivosEl = document.getElementById('totalActivos');
-    
-    if (totalPersonasEl) totalPersonasEl.textContent = total;
-    if (totalAlumnosEl) totalAlumnosEl.textContent = alumnos;
-    if (totalProfesoresEl) totalProfesoresEl.textContent = profesores;
-    if (totalActivosEl) totalActivosEl.textContent = presentes;
 }
 
 // ==================== FUNCIONES RFID ====================
@@ -1087,7 +962,6 @@ function resetearRFID() {
     const rfidMessage = document.getElementById('rfidMessage');
     const tarjetaIdInput = document.getElementById('tarjetaId');
     const tarjetaIdManual = document.getElementById('tarjetaIdManual');
-    
     if (rfidMessage) {
         rfidMessage.innerHTML = '<i class="fas fa-rss"></i><span>Escanear Tarjeta...</span>';
         rfidMessage.classList.remove('scanning', 'scanned');
@@ -1100,21 +974,12 @@ function manejarTarjetaEscaneada(codigo) {
     const tarjetaIdInput = document.getElementById('tarjetaId');
     const rfidMessage = document.getElementById('rfidMessage');
     const tarjetaIdManual = document.getElementById('tarjetaIdManual');
-    
     if (tarjetaIdInput) tarjetaIdInput.value = codigo;
     if (tarjetaIdManual) tarjetaIdManual.value = codigo;
-    
     if (rfidMessage) {
         rfidMessage.innerHTML = `<i class="fas fa-check"></i><span>Tarjeta: ${codigo}</span>`;
         rfidMessage.classList.remove('scanning');
         rfidMessage.classList.add('scanned');
-    }
-    
-    const personaExistente = listaPersonas.find(p => p.tarjeta_id === codigo);
-    if (personaExistente && rfidMessage) {
-        setTimeout(() => {
-            rfidMessage.querySelector('span').textContent = 'Tarjeta ya registrada';
-        }, 1000);
     }
 }
 
@@ -1122,58 +987,43 @@ async function conectarRFID() {
     try {
         if (!puertoSerial) {
             if (!('serial' in navigator)) {
-                mostrarNotificacion('Tu navegador no soporta la API Serial. Usa Chrome o Edge.', 'error', 'Navegador no compatible');
+                mostrarNotificacion('Tu navegador no soporta la API Serial. Usa Chrome o Edge.', 'error');
                 return;
             }
-            
             mostrarCarga('Conectando al lector RFID...');
-            
             puertoSerial = await navigator.serial.requestPort();
             await puertoSerial.open({ baudRate: 115200 });
-            
             ocultarCarga();
-            
             const botonConectar = document.getElementById('connectBtn');
             if (botonConectar) {
                 botonConectar.innerHTML = '<i class="fas fa-plug"></i> Conectado';
                 botonConectar.classList.add("connected");
             }
-            
             const rfidMessage = document.getElementById('rfidMessage');
             if (rfidMessage) {
                 rfidMessage.innerHTML = '<i class="fas fa-rss"></i><span>Escaneando...</span>';
                 rfidMessage.classList.add('scanning');
             }
-            
-            mostrarNotificacion('Lector RFID conectado correctamente', 'success');
+            mostrarNotificacion('Lector RFID conectado', 'success');
             escucharPuertoSerial();
         } else {
             desconectarRFID();
         }
     } catch (err) {
         ocultarCarga();
-        console.error("Error al conectar con el puerto serial:", err);
-        mostrarNotificacion('Error al conectar con el lector RFID: ' + err.message, 'error');
+        mostrarNotificacion('Error al conectar: ' + err.message, 'error');
         resetearRFID();
     }
 }
 
 async function desconectarRFID() {
-    if (lectorSerial) {
-        await lectorSerial.cancel();
-        lectorSerial = null;
-    }
-    if (puertoSerial) {
-        await puertoSerial.close();
-        puertoSerial = null;
-    }
-    
+    if (lectorSerial) { await lectorSerial.cancel(); lectorSerial = null; }
+    if (puertoSerial) { await puertoSerial.close(); puertoSerial = null; }
     const botonConectar = document.getElementById('connectBtn');
     if (botonConectar) {
         botonConectar.innerHTML = '<i class="fas fa-plug"></i> Conectar RFID';
         botonConectar.classList.remove("connected");
     }
-    
     resetearRFID();
     mostrarNotificacion('Lector RFID desconectado', 'info');
 }
@@ -1184,16 +1034,13 @@ async function escucharPuertoSerial() {
         puertoSerial.readable.pipeTo(decodificador.writable);
         lectorSerial = decodificador.readable.getReader();
         let buffer = "";
-
         while (true) {
             const { value, done } = await lectorSerial.read();
             if (done) break;
             if (!value) continue;
-
             buffer += value;
             let lineas = buffer.split(/\r?\n/);
             buffer = lineas.pop();
-
             for (let linea of lineas) {
                 const codigo = linea.trim();
                 if (codigo && /^[A-F0-9]+$/i.test(codigo)) {
@@ -1204,31 +1051,23 @@ async function escucharPuertoSerial() {
     } catch (error) {
         console.error('Error en lectura serial:', error);
         if (error.name !== 'InterruptedError') {
-            mostrarNotificacion('Error en la lectura del puerto serial: ' + error.message, 'error');
+            mostrarNotificacion('Error en lectura serial', 'error');
         }
     }
 }
 
-// ==================== FUNCIONES PARA EL FORMULARIO DE NUEVA PERSONA ====================
+// ==================== FORMULARIO NUEVA PERSONA ====================
 
 function configurarCampoDinamico() {
     const rolSelect = document.getElementById('rol');
     const campoDinamico = document.getElementById('campoDinamico');
     const labelDinamico = document.getElementById('labelDinamico');
     const inputContainer = document.getElementById('inputDinamicoContainer');
-    
     if (!rolSelect || !campoDinamico || !inputContainer) return;
-    
     const rol = rolSelect.value;
-    
-    if (rol === '') {
-        campoDinamico.classList.add('hidden');
-        return;
-    }
-    
+    if (rol === '') { campoDinamico.classList.add('hidden'); return; }
     campoDinamico.classList.remove('hidden');
     inputContainer.innerHTML = '';
-    
     switch(rol) {
         case 'alumno':
             labelDinamico.innerHTML = '<i class="fas fa-graduation-cap"></i> Curso';
@@ -1237,46 +1076,41 @@ function configurarCampoDinamico() {
             selectCurso.name = 'campo_adicional';
             selectCurso.required = true;
             selectCurso.innerHTML = '<option value="">Seleccionar curso</option>';
-            
             listaCursos.forEach(curso => {
                 const option = document.createElement('option');
                 option.value = `${curso.anio}° ${curso.division}`;
                 option.textContent = `${curso.anio}° ${curso.division}ra División`;
                 selectCurso.appendChild(option);
             });
-            
             inputContainer.appendChild(selectCurso);
             break;
-            
         case 'profesor':
             labelDinamico.innerHTML = '<i class="fas fa-book"></i> Materia';
             const inputMateria = document.createElement('input');
             inputMateria.type = 'text';
             inputMateria.id = 'inputDinamico';
             inputMateria.name = 'campo_adicional';
-            inputMateria.placeholder = 'Ej: Matemáticas, Ciencias, etc.';
+            inputMateria.placeholder = 'Ej: Matemáticas';
             inputMateria.required = true;
             inputContainer.appendChild(inputMateria);
             break;
-            
         case 'preceptor':
             labelDinamico.innerHTML = '<i class="fas fa-briefcase"></i> Área';
             const inputArea = document.createElement('input');
             inputArea.type = 'text';
             inputArea.id = 'inputDinamico';
             inputArea.name = 'campo_adicional';
-            inputArea.placeholder = 'Ej: Limpieza, Secretaría, etc.';
+            inputArea.placeholder = 'Ej: Secretaría';
             inputArea.required = true;
             inputContainer.appendChild(inputArea);
             break;
-            
         case 'directivo':
             labelDinamico.innerHTML = '<i class="fas fa-user-tie"></i> Cargo';
             const inputCargo = document.createElement('input');
             inputCargo.type = 'text';
             inputCargo.id = 'inputDinamico';
             inputCargo.name = 'campo_adicional';
-            inputCargo.placeholder = 'Ej: Director, Subdirector, etc.';
+            inputCargo.placeholder = 'Ej: Director';
             inputCargo.required = true;
             inputContainer.appendChild(inputCargo);
             break;
@@ -1285,346 +1119,150 @@ function configurarCampoDinamico() {
 
 function manejarEnvioNuevaPersona(e) {
     e.preventDefault();
-    
     const tarjetaIdInput = document.getElementById('tarjetaId');
     const tarjetaIdManual = document.getElementById('tarjetaIdManual');
     let codigoRFID = '';
-    
-    if (tarjetaIdManual && tarjetaIdManual.value.trim()) {
-        codigoRFID = tarjetaIdManual.value.trim().toUpperCase();
-    } else if (tarjetaIdInput && tarjetaIdInput.value) {
-        codigoRFID = tarjetaIdInput.value;
-    }
-    
+    if (tarjetaIdManual?.value.trim()) codigoRFID = tarjetaIdManual.value.trim().toUpperCase();
+    else if (tarjetaIdInput?.value) codigoRFID = tarjetaIdInput.value;
     const rol = document.getElementById('rol').value;
     if (rol === 'alumno' && !codigoRFID) {
-        mostrarNotificacion('Debe escanear o ingresar manualmente el código de la tarjeta RFID para registrar un alumno', 'warning');
+        mostrarNotificacion('Debe escanear o ingresar el código RFID para registrar un alumno', 'warning');
         return;
     }
-    
-    if (codigoRFID) {
-        const tarjetaExistente = listaPersonas.find(p => p.tarjeta_id === codigoRFID);
-        if (tarjetaExistente) {
-            mostrarNotificacion(`Esta tarjeta ya está registrada para: ${tarjetaExistente.nombre} ${tarjetaExistente.apellido}`, 'error');
-            return;
-        }
+    if (codigoRFID && listaPersonas.find(p => p.tarjeta_id === codigoRFID)) {
+        mostrarNotificacion('Esta tarjeta ya está registrada', 'error');
+        return;
     }
-    
     const nombre = document.getElementById('nombre').value;
     const apellido = document.getElementById('apellido').value;
     const dni = document.getElementById('dni').value;
-    const campoAdicional = document.getElementById('inputDinamico') ? document.getElementById('inputDinamico').value : '';
-    
+    const campoAdicional = document.getElementById('inputDinamico')?.value || '';
     if (!campoAdicional) {
-        const camposRequeridos = {
-            alumno: 'un curso',
-            profesor: 'una materia',
-            preceptor: 'un área',
-            directivo: 'un cargo'
-        };
-        mostrarNotificacion(`Debe especificar ${camposRequeridos[rol]}`, 'warning');
+        const campos = { alumno: 'un curso', profesor: 'una materia', preceptor: 'un área', directivo: 'un cargo' };
+        mostrarNotificacion(`Debe especificar ${campos[rol]}`, 'warning');
         return;
     }
-    
     const nuevaPersona = {
         id: Date.now().toString(),
         tarjeta_id: codigoRFID || `MANUAL_${Date.now()}`,
-        nombre: nombre,
-        apellido: apellido,
-        dni: dni || null,
-        rol: rol,
-        detalle: campoAdicional,
+        nombre, apellido, dni: dni || null,
+        rol, detalle: campoAdicional,
         estado: 'Presente',
         fecha_registro: new Date().toISOString(),
         foto: fotoSeleccionada || null
     };
-    
     listaPersonas.push(nuevaPersona);
     guardarPersonas();
-    
     cargarTablaPersonasPrincipal();
     cargarTablaPersonasSimplificada();
     actualizarEstadisticasRapidas();
-    if (usuarioActual && usuarioActual.cargo === 'directivo') {
-        cargarEstadisticasDetalladas();
-    }
-    
+    if (usuarioActual?.rol === 'directivo') cargarEstadisticasDetalladas();
     mostrarNotificacion('Persona registrada exitosamente', 'success');
     cerrarModal('nuevoAlumnoModal');
 }
 
-// ==================== FUNCIONES DE ADMINISTRACIÓN ====================
-
-function exportarAExcel() {
-    if (!verificarPermiso('exportar_datos')) return;
-    
-    const datos = listaPersonas.map(persona => ({
-        'ID Tarjeta': persona.tarjeta_id || 'No asignado',
-        'Nombre': persona.nombre,
-        'Apellido': persona.apellido,
-        'DNI': persona.dni || '-',
-        'Rol': persona.rol,
-        'Detalle': persona.detalle || '',
-        'Estado': persona.estado,
-        'Fecha Registro': new Date(persona.fecha_registro).toLocaleDateString()
-    }));
-    
-    const csv = convertirACSV(datos);
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const enlace = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    
-    enlace.setAttribute('href', url);
-    enlace.setAttribute('download', `asistencia_expotec_${new Date().toISOString().split('T')[0]}.csv`);
-    enlace.style.visibility = 'hidden';
-    
-    document.body.appendChild(enlace);
-    enlace.click();
-    document.body.removeChild(enlace);
-    
-    mostrarNotificacion('Datos exportados exitosamente', 'success');
-}
-
-function convertirACSV(datos) {
-    if (datos.length === 0) return '';
-    
-    const cabeceras = Object.keys(datos[0]);
-    const filasCSV = [cabeceras.join(',')];
-    
-    for (const fila of datos) {
-        const valores = cabeceras.map(cabecera => {
-            const escapado = ('' + fila[cabecera]).replace(/"/g, '""');
-            return `"${escapado}"`;
-        });
-        filasCSV.push(valores.join(','));
-    }
-    
-    return filasCSV.join('\n');
-}
-
-function mostrarConfiguracion() {
-    if (!verificarPermiso('configurar_sistema')) return;
-    
-    const temaSelect = document.getElementById('configTema');
-    const autoSaveCheck = document.getElementById('configAutoSave');
-    
-    if (temaSelect) temaSelect.value = configuracionSistema.tema;
-    if (autoSaveCheck) autoSaveCheck.checked = configuracionSistema.autoSave;
-    
-    mostrarModal('configuracionModal');
-}
-
-function guardarConfiguracion(e) {
-    e.preventDefault();
-    
-    const tema = document.getElementById('configTema').value;
-    const autoSave = document.getElementById('configAutoSave').checked;
-    
-    configuracionSistema = { tema, autoSave };
-    guardarConfiguracionSistema();
-    aplicarConfiguracion();
-    
-    cerrarModal('configuracionModal');
-    mostrarNotificacion('Configuración guardada exitosamente', 'success');
-}
-
-function mostrarGestionUsuarios() {
-    if (!verificarPermiso('gestionar_usuarios')) return;
-    
-    cargarTablaUsuarios();
-    mostrarModal('gestionUsuariosModal');
-}
-
-function cargarTablaUsuarios() {
-    const tbody = document.getElementById('usuariosTableBody');
-    if (!tbody) return;
-    
-    tbody.innerHTML = '';
-    
-    listaUsuarios.forEach(usuario => {
-        const fila = document.createElement('tr');
-        fila.innerHTML = `
-            <td>${usuario.usuario}</td>
-            <td><span class="rol-badge ${usuario.cargo}">${usuario.cargo}</span></td>
-            <td><span class="status ${usuario.activo ? 'active' : 'inactive'}">${usuario.activo ? 'Activo' : 'Inactivo'}</span></td>
-            <td>
-                <button class="btn-icon eliminar-usuario" data-usuario="${usuario.usuario}">
-                    <i class="fas fa-trash"></i>
-                </button>
-            </td>
-        `;
-        tbody.appendChild(fila);
-    });
-    
-    document.querySelectorAll('.eliminar-usuario').forEach(boton => {
-        boton.addEventListener('click', function() {
-            const usuario = this.getAttribute('data-usuario');
-            eliminarUsuario(usuario);
-        });
-    });
-}
-
-function mostrarNuevoUsuario() {
-    mostrarModal('nuevoUsuarioModal');
-}
-
-function manejarNuevoUsuario(e) {
-    e.preventDefault();
-    
-    const usuario = document.getElementById('usuario').value;
-    const contrasena = document.getElementById('contrasena').value;
-    const cargo = document.getElementById('cargoUsuario').value;
-    
-    if (listaUsuarios.find(u => u.usuario === usuario)) {
-        mostrarNotificacion('El usuario ya existe', 'error');
-        return;
-    }
-    
-    const nuevoUsuario = {
-        usuario,
-        contrasena,
-        cargo,
-        activo: true,
-        nombre: usuario,
-        foto: null,
-        fechaCreacion: new Date().toISOString()
-    };
-    
-    listaUsuarios.push(nuevoUsuario);
-    localStorage.setItem('usuarios', JSON.stringify(listaUsuarios));
-    
-    cerrarModal('nuevoUsuarioModal');
-    cargarTablaUsuarios();
-    mostrarNotificacion('Usuario creado exitosamente', 'success');
-}
-
-function eliminarUsuario(usuario) {
-    mostrarConfirmacion(`¿Estás seguro de eliminar al usuario ${usuario}?`, () => {
-        listaUsuarios = listaUsuarios.filter(u => u.usuario !== usuario);
-        localStorage.setItem('usuarios', JSON.stringify(listaUsuarios));
-        cargarTablaUsuarios();
-        mostrarNotificacion('Usuario eliminado correctamente', 'success');
-    });
-}
-
-// ==================== SISTEMA DE LOGIN Y PERMISOS ====================
-
-function verificarPermiso(permiso) {
-    if (!usuarioActual) {
-        mostrarLoginAdmin();
-        return false;
-    }
-    
-    const permisosPorCargo = {
-        'directivo': ['ver_estadisticas', 'exportar_datos', 'configurar_sistema', 'gestionar_usuarios', 'editar_personas', 'eliminar_personas', 'crear_personas'],
-        'profesor': ['ver_estadisticas'],
-        'preceptor': ['ver_estadisticas']
-    };
-    
-    if (permisosPorCargo[usuarioActual.cargo]?.includes(permiso)) {
-        return true;
-    }
-    
-    mostrarNotificacion('No tienes permisos para realizar esta acción', 'warning');
-    return false;
-}
-
-function mostrarLoginAdmin() {
-    mostrarModal('loginAdminModal');
-}
-
-function manejarLoginAdmin(e) {
-    e.preventDefault();
-    
-    const usuario = document.getElementById('adminUsuario').value;
-    const contrasena = document.getElementById('adminContrasena').value;
-    
-    const usuarioEncontrado = listaUsuarios.find(u => 
-        u.usuario === usuario && u.contrasena === contrasena && u.activo
-    );
-    
-    if (usuarioEncontrado) {
-        usuarioActual = {
-            usuario: usuarioEncontrado.usuario,
-            cargo: usuarioEncontrado.cargo
-        };
-        localStorage.setItem('usuarioActual', JSON.stringify(usuarioActual));
-        cerrarModal('loginAdminModal');
-        actualizarVisibilidadPorRol();
-        
-        if (usuarioActual.cargo === 'directivo') {
-            cargarEstadisticasDetalladas();
-        }
-        
-        mostrarNotificacion(`Bienvenido ${usuarioEncontrado.cargo}`, 'success');
-    } else {
-        mostrarNotificacion('Usuario o contraseña incorrectos', 'error');
-    }
-}
-
-function cerrarSesion() {
-    mostrarConfirmacion('¿Estás seguro de que deseas cerrar sesión?', () => {
-        usuarioActual = null;
-        localStorage.removeItem('usuarioActual');
-        actualizarVisibilidadPorRol();
-        document.querySelector('.nav-link[data-section="home"]').click();
-        mostrarNotificacion('Sesión cerrada correctamente', 'info');
-    });
-}
-
-// ==================== INICIALIZACIÓN Y EVENT LISTENERS ====================
+// ==================== INICIALIZACIÓN DE EVENTOS ====================
 
 function inicializarEventListeners() {
-    const sidebar = document.getElementById('sidebar');
     const menuToggle = document.getElementById('menuToggle');
     const closeSidebar = document.getElementById('closeSidebar');
     const overlay = document.getElementById('overlay');
-    const navLinks = document.querySelectorAll('.nav-link');
-    const sections = document.querySelectorAll('.section');
     
-    if (menuToggle) {
-        menuToggle.addEventListener('click', function() {
-            sidebar.classList.add('active');
-            overlay.classList.add('active');
-            document.body.style.overflow = 'hidden';
-        });
-    }
+    menuToggle?.addEventListener('click', () => {
+        document.getElementById('sidebar').classList.add('active');
+        overlay.classList.add('active');
+        document.body.style.overflow = 'hidden';
+    });
     
-    const cerrarSidebarFunc = function() {
-        sidebar.classList.remove('active');
-        overlay.classList.remove('active');
+    const cerrar = () => {
+        document.getElementById('sidebar').classList.remove('active');
+        overlay?.classList.remove('active');
         document.body.style.overflow = 'auto';
     };
+    closeSidebar?.addEventListener('click', cerrar);
+    overlay?.addEventListener('click', cerrar);
     
-    if (closeSidebar) closeSidebar.addEventListener('click', cerrarSidebarFunc);
-    if (overlay) overlay.addEventListener('click', cerrarSidebarFunc);
+    document.getElementById('btnLogoutHeader')?.addEventListener('click', cerrarSesion);
+    document.getElementById('btnConfiguracion')?.addEventListener('click', () => mostrarModal('configuracionModal'));
+    document.getElementById('btnExportar')?.addEventListener('click', () => mostrarNotificacion('Exportando datos...', 'info'));
+    document.getElementById('btnAsociarUsuario')?.addEventListener('click', () => { cargarSelectPersonas(); mostrarModal('asociarUsuarioModal'); });
+    document.getElementById('btnCrearAnuncio')?.addEventListener('click', () => mostrarModal('crearAnuncioModal'));
+    document.getElementById('btnNuevoCurso')?.addEventListener('click', () => mostrarModal('nuevoCursoModal'));
+    document.getElementById('btnExportarEstadisticas')?.addEventListener('click', exportarEstadisticasAExcel);
+    document.getElementById('btnImprimirEstadisticas')?.addEventListener('click', imprimirEstadisticas);
     
-    navLinks.forEach(link => {
-        link.addEventListener('click', function(e) {
-            e.preventDefault();
-            
-            navLinks.forEach(nav => nav.classList.remove('active'));
-            this.classList.add('active');
-            
-            sections.forEach(section => section.classList.remove('active'));
-            const sectionId = this.getAttribute('data-section');
-            document.getElementById(sectionId).classList.add('active');
-            
-            if (sectionId === 'estadisticas' && usuarioActual && usuarioActual.cargo === 'directivo') {
-                cargarEstadisticasDetalladas();
-            }
-            
-            if (window.innerWidth < 992) {
-                cerrarSidebarFunc();
-            }
-        });
+    const abrirModalPersona = () => {
+        if (usuarioActual?.rol === 'directivo' || usuarioActual?.rol === 'preceptor') {
+            resetearRFID();
+            fotoSeleccionada = null;
+            document.getElementById('previewImage').src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23bdc3c7'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E";
+            document.getElementById('btnEliminarFoto').style.display = 'none';
+            mostrarModal('nuevoAlumnoModal');
+        } else {
+            mostrarNotificacion('No tienes permisos', 'warning');
+        }
+    };
+    document.getElementById('btnNuevaPersona')?.addEventListener('click', abrirModalPersona);
+    document.getElementById('nuevaPersonaBtn')?.addEventListener('click', abrirModalPersona);
+    
+    document.getElementById('fotoPerfil')?.addEventListener('change', (e) => { if (e.target.files?.[0]) manejarSeleccionFoto(e.target.files[0]); });
+    document.getElementById('btnEliminarFoto')?.addEventListener('click', eliminarFotoSeleccionada);
+    document.getElementById('rol')?.addEventListener('change', configurarCampoDinamico);
+    document.getElementById('connectBtn')?.addEventListener('click', conectarRFID);
+    document.getElementById('tarjetaIdManual')?.addEventListener('input', function() { document.getElementById('tarjetaId').value = this.value.toUpperCase(); });
+    document.getElementById('formNuevoAlumno')?.addEventListener('submit', manejarEnvioNuevaPersona);
+    
+    document.getElementById('formNuevoCurso')?.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const anio = document.getElementById('anio').value;
+        const division = document.getElementById('division').value;
+        if (anio && division) {
+            listaCursos.push({ id: Date.now().toString(), anio: parseInt(anio), division: parseInt(division), fechaCreacion: new Date().toISOString() });
+            guardarCursos();
+            cargarTablaCursos();
+            cerrarModal('nuevoCursoModal');
+            mostrarNotificacion('Curso creado', 'success');
+        }
     });
     
-    document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape') cerrarSidebarFunc();
+    document.getElementById('formAsociarUsuario')?.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const usuario = document.getElementById('nuevoUsuarioNombre').value;
+        const pass = document.getElementById('nuevoUsuarioPass').value;
+        const rol = document.getElementById('nuevoUsuarioRol').value;
+        const idPersona = document.getElementById('selectPersona').value;
+        if (!usuario || !pass || !rol || !idPersona) { mostrarNotificacion('Complete todos los campos', 'warning'); return; }
+        if (pass.length < 4) { mostrarNotificacion('La contraseña debe tener al menos 4 caracteres', 'warning'); return; }
+        if (asociarUsuarioAPersona(usuario, pass, rol, idPersona)) {
+            cerrarModal('asociarUsuarioModal');
+            cargarTablaUsuariosGestion();
+            mostrarNotificacion('Usuario asociado', 'success');
+        }
     });
     
-    // Filtros
+    document.getElementById('formCrearAnuncio')?.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const titulo = document.getElementById('anuncioTitulo').value;
+        const contenido = document.getElementById('anuncioContenido').value;
+        const visibilidad = document.getElementById('anuncioVisibilidad').value;
+        if (titulo && contenido) {
+            crearAnuncio(titulo, contenido, visibilidad);
+            cerrarModal('crearAnuncioModal');
+            mostrarNotificacion('Anuncio publicado', 'success');
+        }
+    });
+    
+    document.getElementById('formConfiguracion')?.addEventListener('submit', (e) => {
+        e.preventDefault();
+        configuracionSistema.tema = document.getElementById('configTema').value;
+        configuracionSistema.autoSave = document.getElementById('configAutoSave').checked;
+        localStorage.setItem('configuracion', JSON.stringify(configuracionSistema));
+        document.body.classList.remove('tema-default', 'tema-dark', 'tema-light');
+        document.body.classList.add(`tema-${configuracionSistema.tema}`);
+        cerrarModal('configuracionModal');
+        mostrarNotificacion('Configuración guardada', 'success');
+    });
+    
     document.querySelectorAll('#personas .filter-tab').forEach(tab => {
         tab.addEventListener('click', function() {
             document.querySelectorAll('#personas .filter-tab').forEach(t => t.classList.remove('active'));
@@ -1645,195 +1283,95 @@ function inicializarEventListeners() {
         tab.addEventListener('click', function() {
             document.querySelectorAll('#asistencias .filter-tab').forEach(t => t.classList.remove('active'));
             this.classList.add('active');
-            filtroActual = this.getAttribute('data-filter');
+            filtroActual = this.dataset.filter;
+            currentPage = 1;
             cargarTablaPersonasPrincipal();
             actualizarEstadisticasRapidas();
         });
     });
     
-    // Búsquedas
-    const searchPersonas = document.getElementById('searchPersonas');
-    if (searchPersonas) {
-        searchPersonas.addEventListener('input', function(e) {
-            const termino = e.target.value.toLowerCase();
-            const filas = document.querySelectorAll('#personasTableBody_personas tr');
-            filas.forEach(fila => {
-                const texto = fila.textContent.toLowerCase();
-                fila.style.display = texto.includes(termino) ? '' : 'none';
+    document.getElementById('searchPersonas')?.addEventListener('input', function(e) {
+        const termino = e.target.value.toLowerCase();
+        document.querySelectorAll('#personasTableBody_personas tr').forEach(row => {
+            row.style.display = row.textContent.toLowerCase().includes(termino) ? '' : 'none';
+        });
+    });
+    
+    document.getElementById('searchCursos')?.addEventListener('input', function(e) {
+        const termino = e.target.value.toLowerCase();
+        document.querySelectorAll('#cursosTableBody tr').forEach(row => {
+            row.style.display = row.textContent.toLowerCase().includes(termino) ? '' : 'none';
+        });
+    });
+    
+    document.getElementById('searchInput')?.addEventListener('input', () => { currentPage = 1; cargarTablaPersonasPrincipal(); });
+    document.getElementById('prevPage')?.addEventListener('click', () => { if (currentPage > 1) { currentPage--; cargarTablaPersonasPrincipal(); } });
+    document.getElementById('nextPage')?.addEventListener('click', () => { currentPage++; cargarTablaPersonasPrincipal(); });
+    
+    document.getElementById('btnCambiarEstado')?.addEventListener('click', () => {
+        if (personaActualFicha) {
+            const nuevoEstado = personaActualFicha.estado === 'Presente' ? 'Ausente' : 'Presente';
+            mostrarConfirmacion(`¿Cambiar estado a ${nuevoEstado}?`, () => {
+                personaActualFicha.estado = nuevoEstado;
+                guardarPersonas();
+                cargarTablaPersonasPrincipal();
+                actualizarEstadisticasRapidas();
+                if (usuarioActual?.rol === 'directivo') cargarEstadisticasDetalladas();
+                mostrarFichaAlumno(personaActualFicha.tarjeta_id);
+                mostrarNotificacion(`Estado cambiado a ${nuevoEstado}`, 'success');
             });
-        });
-    }
+        }
+    });
     
-    const searchCursos = document.getElementById('searchCursos');
-    if (searchCursos) {
-        searchCursos.addEventListener('input', function(e) {
-            const termino = e.target.value.toLowerCase();
-            const filas = document.querySelectorAll('#cursosTableBody tr');
-            filas.forEach(fila => {
-                const texto = fila.textContent.toLowerCase();
-                fila.style.display = texto.includes(termino) ? '' : 'none';
+    document.getElementById('btnEliminarFicha')?.addEventListener('click', () => {
+        if (personaActualFicha) {
+            mostrarConfirmacion(`¿Eliminar a ${personaActualFicha.nombre}?`, () => {
+                listaPersonas = listaPersonas.filter(p => p.tarjeta_id !== personaActualFicha.tarjeta_id);
+                guardarPersonas();
+                cargarTablaPersonasPrincipal();
+                cargarTablaPersonasSimplificada();
+                actualizarEstadisticasRapidas();
+                if (usuarioActual?.rol === 'directivo') cargarEstadisticasDetalladas();
+                cerrarModal('fichaAlumnoModal');
+                mostrarNotificacion('Persona eliminada', 'success');
             });
-        });
-    }
-    
-    const searchInput = document.getElementById('searchInput');
-    if (searchInput) {
-        searchInput.addEventListener('input', function() {
-            cargarTablaPersonasPrincipal();
-        });
-    }
-    
-    // Botones nueva persona
-    const btnNuevaPersona = document.getElementById('btnNuevaPersona');
-    const nuevaPersonaBtn = document.getElementById('nuevaPersonaBtn');
-    
-    const abrirModalNuevaPersona = () => {
-        if (!verificarPermiso('crear_personas')) return;
-        resetearRFID();
-        fotoSeleccionada = null;
-        const previewImg = document.getElementById('previewImage');
-        if (previewImg) {
-            previewImg.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23bdc3c7'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E";
         }
-        document.getElementById('btnEliminarFoto').style.display = 'none';
-        mostrarModal('nuevoAlumnoModal');
-    };
-    
-    if (btnNuevaPersona) btnNuevaPersona.addEventListener('click', abrirModalNuevaPersona);
-    if (nuevaPersonaBtn) nuevaPersonaBtn.addEventListener('click', abrirModalNuevaPersona);
-    
-    // Carga de foto
-    const fotoInput = document.getElementById('fotoPerfil');
-    const btnEliminarFoto = document.getElementById('btnEliminarFoto');
-    
-    if (fotoInput) {
-        fotoInput.addEventListener('change', (e) => {
-            if (e.target.files && e.target.files[0]) {
-                manejarSeleccionFoto(e.target.files[0]);
+    });
+
+        // ==================== CIERRE DE MODALES GLOBAL ====================
+    // Cerrar modal al hacer clic en la X (close-modal)
+    document.querySelectorAll('.close-modal').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const modal = this.closest('.modal');
+            if (modal) cerrarModal(modal.id);
+        });
+    });
+
+    // Cerrar modal al hacer clic en el botón Cancelar (dentro de modales)
+    document.querySelectorAll('.modal .btn-cancel').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const modal = this.closest('.modal');
+            if (modal) cerrarModal(modal.id);
+        });
+    });
+
+    // Cerrar modal al hacer clic en el overlay (fondo oscuro)
+    document.querySelectorAll('.modal').forEach(modal => {
+        modal.addEventListener('click', function(e) {
+            if (e.target === modal) {
+                cerrarModal(modal.id);
             }
         });
-    }
-    
-    if (btnEliminarFoto) {
-        btnEliminarFoto.addEventListener('click', eliminarFotoSeleccionada);
-    }
-    
-    // Rol change
-    const rolSelect = document.getElementById('rol');
-    if (rolSelect) {
-        rolSelect.addEventListener('change', configurarCampoDinamico);
-    }
-    
-    // RFID connect
-    const connectBtn = document.getElementById('connectBtn');
-    if (connectBtn) {
-        connectBtn.addEventListener('click', conectarRFID);
-    }
-    
-    // Manual RFID input
-    const tarjetaIdManual = document.getElementById('tarjetaIdManual');
-    if (tarjetaIdManual) {
-        tarjetaIdManual.addEventListener('input', function() {
-            const tarjetaIdInput = document.getElementById('tarjetaId');
-            if (tarjetaIdInput) {
-                tarjetaIdInput.value = this.value.toUpperCase();
-            }
-        });
-    }
-    
-    // Form nueva persona
-    const formNuevoAlumno = document.getElementById('formNuevoAlumno');
-    if (formNuevoAlumno) {
-        formNuevoAlumno.addEventListener('submit', manejarEnvioNuevaPersona);
-    }
-    
-    // Botón nuevo curso
-    const btnNuevoCurso = document.getElementById('btnNuevoCurso');
-    if (btnNuevoCurso) {
-        btnNuevoCurso.addEventListener('click', () => mostrarModal('nuevoCursoModal'));
-    }
-    
-    // Form nuevo curso
-    const formNuevoCurso = document.getElementById('formNuevoCurso');
-    if (formNuevoCurso) {
-        formNuevoCurso.addEventListener('submit', function(e) {
-            e.preventDefault();
-            const anio = document.getElementById('anio').value;
-            const division = document.getElementById('division').value;
-            
-            if (anio && division) {
-                crearCurso(anio, division);
-                cargarTablaCursos();
-                cerrarModal('nuevoCursoModal');
-                formNuevoCurso.reset();
-                mostrarNotificacion('Curso creado exitosamente', 'success');
-            }
-        });
-    }
-    
-    // Botones administración
-    const btnExportar = document.getElementById('btnExportar');
-    const btnConfiguracion = document.getElementById('btnConfiguracion');
-    const btnGestionUsuarios = document.getElementById('btnGestionUsuarios');
-    const btnCerrarSesion = document.getElementById('btnCerrarSesion');
-    const btnNuevoUsuario = document.getElementById('btnNuevoUsuario');
-    const btnLogoutHeader = document.getElementById('btnLogoutHeader');
-    
-    if (btnExportar) btnExportar.addEventListener('click', exportarAExcel);
-    if (btnConfiguracion) btnConfiguracion.addEventListener('click', mostrarConfiguracion);
-    if (btnGestionUsuarios) btnGestionUsuarios.addEventListener('click', mostrarGestionUsuarios);
-    if (btnCerrarSesion) btnCerrarSesion.addEventListener('click', cerrarSesion);
-    if (btnLogoutHeader) btnLogoutHeader.addEventListener('click', cerrarSesion);
-    if (btnNuevoUsuario) btnNuevoUsuario.addEventListener('click', mostrarNuevoUsuario);
-    
-    // Botones estadísticas
-    const btnExportarEstadisticas = document.getElementById('btnExportarEstadisticas');
-    const btnImprimirEstadisticas = document.getElementById('btnImprimirEstadisticas');
-    
-    if (btnExportarEstadisticas) {
-        btnExportarEstadisticas.addEventListener('click', exportarEstadisticasAExcel);
-    }
-    if (btnImprimirEstadisticas) {
-        btnImprimirEstadisticas.addEventListener('click', imprimirEstadisticas);
-    }
-    
-    // Formularios
-    const formConfiguracion = document.getElementById('formConfiguracion');
-    if (formConfiguracion) {
-        formConfiguracion.addEventListener('submit', guardarConfiguracion);
-    }
-    
-    const formNuevoUsuario = document.getElementById('formNuevoUsuario');
-    if (formNuevoUsuario) {
-        formNuevoUsuario.addEventListener('submit', manejarNuevoUsuario);
-    }
-    
-    const formLoginAdmin = document.getElementById('formLoginAdmin');
-    if (formLoginAdmin) {
-        formLoginAdmin.addEventListener('submit', manejarLoginAdmin);
-    }
-    
-    window.addEventListener('resize', function() {
-        if (window.innerWidth >= 992) {
-            if (sidebar) sidebar.classList.remove('active');
-            if (overlay) overlay.classList.remove('active');
-            document.body.style.overflow = 'auto';
-        }
     });
 }
 
-// ==================== PUNTO DE ENTRADA PRINCIPAL ====================
+// ==================== INICIO DEL SISTEMA ====================
 
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('Sistema iniciado - Versión completa con fotos y fichas de alumnos');
-    
+document.addEventListener('DOMContentLoaded', () => {
+    console.log('=== SISTEMA EXPOTEC 2026 INICIADO ===');
     cargarDatosIniciales();
-    inicializarModales();
-    aplicarConfiguracion();
+    inicializarLogin();
     inicializarEventListeners();
-    
-    cargarTablaPersonasSimplificada();
-    cargarTablaCursos();
-    cargarTablaPersonasPrincipal();
-    actualizarEstadisticasRapidas();
+    actualizarUIporSesion();
+    document.body.classList.add(`tema-${configuracionSistema.tema}`);
 });
