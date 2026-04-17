@@ -534,24 +534,40 @@ function cargarTablaPersonasPrincipal() {
                 <td><span class="status ${persona.estado === 'Presente' ? 'active' : 'inactive'}">${persona.estado}</span></td>
                 <td>${new Date(persona.fecha_registro).toLocaleDateString()}</td>
                 <td>
+                    <!-- ========== AQUÍ VA EL BLOQUE DE ACCIONES ========== -->
                     <button class="btn-icon ver-ficha-asistencia" data-id="${persona.tarjeta_id}"><i class="fas fa-id-card"></i></button>
                     ${(usuarioActual?.rol === 'directivo' || usuarioActual?.rol === 'preceptor') ? `
                         <button class="btn-icon editar-persona" data-id="${persona.tarjeta_id}"><i class="fas fa-edit"></i></button>
                         <button class="btn-icon eliminar-persona" data-id="${persona.tarjeta_id}"><i class="fas fa-trash"></i></button>
                     ` : ''}
+                    <!-- ========== FIN DEL BLOQUE ========== -->
                 </td>
             </tr>
         `).join('');
     }
     
+    // Actualizar contadores y paginación
     document.getElementById('personasCount').textContent = datosFiltrados.length;
     document.getElementById('totalCount').textContent = listaPersonas.length;
     document.getElementById('currentPage').textContent = currentPage;
     document.getElementById('prevPage').disabled = currentPage === 1;
     document.getElementById('nextPage').disabled = start + itemsPerPage >= datosFiltrados.length;
     
+    // Event listeners para los botones (ver ficha, editar, eliminar)
     document.querySelectorAll('.ver-ficha-asistencia').forEach(btn => {
         btn.addEventListener('click', (e) => { e.stopPropagation(); mostrarFichaAlumno(btn.getAttribute('data-id')); });
+    });
+    
+    // 👇 IMPORTANTE: Agregar event listener para los botones editar-persona
+    document.querySelectorAll('.editar-persona').forEach(btn => {
+        btn.addEventListener('click', (e) => { 
+            e.stopPropagation(); 
+            abrirModalEditarPersona(btn.getAttribute('data-id')); 
+        });
+    });
+    
+    document.querySelectorAll('.eliminar-persona').forEach(btn => {
+        btn.addEventListener('click', (e) => { e.stopPropagation(); /* función eliminar */ });
     });
 }
 
@@ -1164,6 +1180,79 @@ function manejarEnvioNuevaPersona(e) {
 // ==================== INICIALIZACIÓN DE EVENTOS ====================
 
 function inicializarEventListeners() {
+
+        // Exportar personas (sección Personas)
+    const exportarPersonasBtn = document.createElement('button');
+    exportarPersonasBtn.innerHTML = '<i class="fas fa-file-excel"></i> Exportar Excel';
+    exportarPersonasBtn.className = 'btn btn-excel btn-sm';
+    exportarPersonasBtn.onclick = exportarPersonasExcel;
+    document.querySelector('#personas .action-group')?.appendChild(exportarPersonasBtn);
+    
+    // Exportar cursos (sección Cursos)
+    const exportarCursosBtn = document.createElement('button');
+    exportarCursosBtn.innerHTML = '<i class="fas fa-file-excel"></i> Exportar Excel';
+    exportarCursosBtn.className = 'btn btn-excel btn-sm';
+    exportarCursosBtn.onclick = exportarCursosExcel;
+    document.querySelector('#cursos .action-group')?.appendChild(exportarCursosBtn);
+    
+    // Selector de fecha para historial de asistencia
+    document.getElementById('btnCargarAsistenciaFecha')?.addEventListener('click', () => {
+        const fecha = document.getElementById('fechaAsistencia').value;
+        if (fecha) {
+            fechaActualAsistencia = fecha;
+            cargarAsistenciasPorFecha(fecha);
+        }
+    });
+    
+    document.getElementById('btnHoy')?.addEventListener('click', () => {
+        const hoy = new Date().toISOString().split('T')[0];
+        document.getElementById('fechaAsistencia').value = hoy;
+        fechaActualAsistencia = hoy;
+        // Restaurar estados reales
+        listaPersonas.forEach(p => {
+            if (p.estado_original) {
+                p.estado = p.estado_original;
+                delete p.estado_original;
+            }
+        });
+        guardarPersonas();
+        cargarAsistenciasPorFecha(hoy);
+    });
+    
+    document.getElementById('btnExportarAsistenciaExcel')?.addEventListener('click', exportarAsistenciaExcel);
+    
+    // Formulario de editar persona
+    document.getElementById('formEditarPersona')?.addEventListener('submit', guardarEdicionPersona);
+    document.getElementById('editFotoPerfil')?.addEventListener('change', (e) => {
+        if (e.target.files?.[0]) manejarFotoEdit(e.target.files[0]);
+    });
+    document.getElementById('btnEliminarFotoEdit')?.addEventListener('click', () => {
+        nuevaFotoEdit = null;
+        document.getElementById('editPreviewImage').src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23bdc3c7'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E";
+        mostrarNotificacion('Foto eliminada', 'info');
+    });
+    document.getElementById('editRol')?.addEventListener('change', function() {
+        configurarCampoDinamicoEdicion(this.value, '');
+    });
+    
+    // Modificar el event listener de cambio de estado en ficha para usar fecha
+    const btnCambiarEstadoOriginal = document.getElementById('btnCambiarEstado');
+    if (btnCambiarEstadoOriginal) {
+        const nuevoBtn = btnCambiarEstadoOriginal.cloneNode(true);
+        btnCambiarEstadoOriginal.parentNode.replaceChild(nuevoBtn, btnCambiarEstadoOriginal);
+        nuevoBtn.addEventListener('click', () => {
+            if (personaActualFicha) {
+                const nuevoEstado = personaActualFicha.estado === 'Presente' ? 'Ausente' : 'Presente';
+                const fechaActual = fechaActualAsistencia || new Date().toISOString().split('T')[0];
+                mostrarConfirmacion(`¿Cambiar estado a ${nuevoEstado} para el día ${fechaActual}?`, () => {
+                    cambiarEstadoConFecha(personaActualFicha.tarjeta_id, nuevoEstado, fechaActual);
+                    cargarAsistenciasPorFecha(fechaActual);
+                    mostrarFichaAlumno(personaActualFicha.tarjeta_id);
+                });
+            }
+        });
+    }
+
     const menuToggle = document.getElementById('menuToggle');
     const closeSidebar = document.getElementById('closeSidebar');
     const overlay = document.getElementById('overlay');
@@ -1363,6 +1452,389 @@ function inicializarEventListeners() {
             }
         });
     });
+}
+
+// ==================== EDITAR PERSONA ====================
+
+let personaEditando = null;
+let nuevaFotoEdit = null;
+
+function abrirModalEditarPersona(personaId) {
+    const persona = listaPersonas.find(p => p.tarjeta_id === personaId || p.id === personaId);
+    if (!persona) return;
+    
+    personaEditando = persona;
+    nuevaFotoEdit = null;
+    
+    document.getElementById('editPersonaId').value = persona.tarjeta_id || persona.id;
+    document.getElementById('editNombre').value = persona.nombre;
+    document.getElementById('editApellido').value = persona.apellido;
+    document.getElementById('editDni').value = persona.dni || '';
+    document.getElementById('editTarjetaId').value = persona.tarjeta_id || '';
+    document.getElementById('editRol').value = persona.rol;
+    
+    // Foto
+    const preview = document.getElementById('editPreviewImage');
+    preview.src = persona.foto || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23bdc3c7'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E";
+    
+    // Configurar campo dinámico
+    configurarCampoDinamicoEdicion(persona.rol, persona.detalle);
+    
+    mostrarModal('editarPersonaModal');
+}
+
+function configurarCampoDinamicoEdicion(rol, valorActual) {
+    const container = document.getElementById('editInputContainer');
+    const label = document.getElementById('editLabelDinamico');
+    
+    if (!container) return;
+    container.innerHTML = '';
+    
+    switch(rol) {
+        case 'alumno':
+            label.innerHTML = '<i class="fas fa-graduation-cap"></i> Curso';
+            const selectCurso = document.createElement('select');
+            selectCurso.id = 'editInputDinamico';
+            selectCurso.className = 'edit-field';
+            selectCurso.innerHTML = '<option value="">Seleccionar curso</option>';
+            listaCursos.forEach(curso => {
+                const option = document.createElement('option');
+                option.value = `${curso.anio}° ${curso.division}`;
+                option.textContent = `${curso.anio}° ${curso.division}ra División`;
+                if (option.value === valorActual) option.selected = true;
+                selectCurso.appendChild(option);
+            });
+            container.appendChild(selectCurso);
+            break;
+        case 'profesor':
+            label.innerHTML = '<i class="fas fa-book"></i> Materia';
+            const inputMateria = document.createElement('input');
+            inputMateria.type = 'text';
+            inputMateria.id = 'editInputDinamico';
+            inputMateria.className = 'edit-field';
+            inputMateria.value = valorActual || '';
+            inputMateria.placeholder = 'Ej: Matemáticas';
+            container.appendChild(inputMateria);
+            break;
+        case 'preceptor':
+            label.innerHTML = '<i class="fas fa-briefcase"></i> Área';
+            const inputArea = document.createElement('input');
+            inputArea.type = 'text';
+            inputArea.id = 'editInputDinamico';
+            inputArea.className = 'edit-field';
+            inputArea.value = valorActual || '';
+            inputArea.placeholder = 'Ej: Secretaría';
+            container.appendChild(inputArea);
+            break;
+        case 'directivo':
+            label.innerHTML = '<i class="fas fa-user-tie"></i> Cargo';
+            const inputCargo = document.createElement('input');
+            inputCargo.type = 'text';
+            inputCargo.id = 'editInputDinamico';
+            inputCargo.className = 'edit-field';
+            inputCargo.value = valorActual || '';
+            inputCargo.placeholder = 'Ej: Director';
+            container.appendChild(inputCargo);
+            break;
+        default:
+            document.getElementById('editCampoDinamico').style.display = 'none';
+            return;
+    }
+    document.getElementById('editCampoDinamico').style.display = 'block';
+}
+
+async function guardarEdicionPersona(e) {
+    e.preventDefault();
+    
+    if (!personaEditando) return;
+    
+    const nuevoDetalle = document.getElementById('editInputDinamico')?.value || '';
+    const nuevoRol = document.getElementById('editRol').value;
+    
+    // Validación
+    if (nuevoRol === 'alumno' && !nuevoDetalle) {
+        mostrarNotificacion('Debe seleccionar un curso', 'warning');
+        return;
+    }
+    
+    // Actualizar datos
+    personaEditando.nombre = document.getElementById('editNombre').value;
+    personaEditando.apellido = document.getElementById('editApellido').value;
+    personaEditando.dni = document.getElementById('editDni').value;
+    personaEditando.rol = nuevoRol;
+    personaEditando.detalle = nuevoDetalle;
+    
+    // Actualizar foto si cambió
+    if (nuevaFotoEdit) {
+        personaEditando.foto = nuevaFotoEdit;
+    }
+    
+    // Guardar en localStorage
+    guardarPersonas();
+    
+    // Recargar todas las tablas
+    cargarTablaPersonasPrincipal();
+    cargarTablaPersonasSimplificada();
+    actualizarEstadisticasRapidas();
+    if (usuarioActual?.rol === 'directivo') cargarEstadisticasDetalladas();
+    
+    cerrarModal('editarPersonaModal');
+    mostrarNotificacion('Persona actualizada correctamente', 'success');
+}
+
+async function manejarFotoEdit(file) {
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+        mostrarNotificacion('La imagen es demasiado grande. Máximo 2MB', 'warning');
+        return;
+    }
+    const tiposPermitidos = ['image/jpeg', 'image/png', 'image/gif'];
+    if (!tiposPermitidos.includes(file.type)) {
+        mostrarNotificacion('Formato no soportado', 'warning');
+        return;
+    }
+    
+    mostrarCarga('Procesando imagen...');
+    try {
+        const base64 = await convertirImagenABase64(file);
+        nuevaFotoEdit = base64;
+        document.getElementById('editPreviewImage').src = base64;
+        ocultarCarga();
+    } catch (error) {
+        ocultarCarga();
+        mostrarNotificacion('Error al procesar la imagen', 'error');
+    }
+}
+
+// ==================== EXPORTAR ASISTENCIA A EXCEL ====================
+
+function exportarAsistenciaExcel() {
+    const fechaSeleccionada = document.getElementById('fechaAsistencia')?.value || new Date().toISOString().split('T')[0];
+    const filtro = filtroActual || 'todos';
+    
+    let personasFiltradas = listaPersonas;
+    if (filtro !== 'todos') {
+        personasFiltradas = listaPersonas.filter(p => p.rol === filtro);
+    }
+    
+    const searchTerm = document.getElementById('searchInput')?.value.toLowerCase() || '';
+    if (searchTerm) {
+        personasFiltradas = personasFiltradas.filter(p => 
+            p.nombre.toLowerCase().includes(searchTerm) || 
+            p.apellido.toLowerCase().includes(searchTerm) ||
+            (p.tarjeta_id && p.tarjeta_id.toLowerCase().includes(searchTerm))
+        );
+    }
+    
+    // Obtener estado de asistencia para la fecha seleccionada
+    const asistenciasFecha = JSON.parse(localStorage.getItem('asistencias_historico') || '{}');
+    
+    const datos = personasFiltradas.map(p => ({
+        'ID Tarjeta': p.tarjeta_id || '-',
+        'Nombre': p.nombre,
+        'Apellido': p.apellido,
+        'DNI': p.dni || '-',
+        'Rol': p.rol,
+        'Detalle': p.detalle || '-',
+        'Estado': asistenciasFecha[`${p.tarjeta_id}_${fechaSeleccionada}`] || p.estado || 'Presente',
+        'Fecha': fechaSeleccionada
+    }));
+    
+    if (datos.length === 0) {
+        mostrarNotificacion('No hay datos para exportar', 'warning');
+        return;
+    }
+    
+    // Generar CSV
+    const cabeceras = Object.keys(datos[0]);
+    let csv = cabeceras.join(',') + '\n';
+    
+    datos.forEach(fila => {
+        const valores = cabeceras.map(cab => {
+            let valor = fila[cab] || '';
+            if (typeof valor === 'string' && (valor.includes(',') || valor.includes('"'))) {
+                valor = `"${valor.replace(/"/g, '""')}"`;
+            }
+            return valor;
+        });
+        csv += valores.join(',') + '\n';
+    });
+    
+    const blob = new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8;' });
+    const enlace = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    enlace.href = url;
+    enlace.setAttribute('download', `asistencia_${fechaSeleccionada}_${filtro}.csv`);
+    document.body.appendChild(enlace);
+    enlace.click();
+    document.body.removeChild(enlace);
+    URL.revokeObjectURL(url);
+    
+    mostrarNotificacion('Exportado a Excel correctamente', 'success');
+}
+
+// ==================== HISTORIAL DE ASISTENCIA POR FECHA ====================
+
+let fechaActualAsistencia = new Date().toISOString().split('T')[0];
+
+function cargarAsistenciasPorFecha(fecha) {
+    const asistenciasHistorico = JSON.parse(localStorage.getItem('asistencias_historico') || '{}');
+    const fechaStr = fecha || fechaActualAsistencia;
+    
+    // Aplicar el estado guardado a listaPersonas (solo para visualización)
+    listaPersonas.forEach(persona => {
+        const key = `${persona.tarjeta_id}_${fechaStr}`;
+        if (asistenciasHistorico[key]) {
+            persona.estado_original = persona.estado;
+            persona.estado = asistenciasHistorico[key];
+        } else if (fechaStr !== new Date().toISOString().split('T')[0]) {
+            // Para fechas pasadas sin registro, marcar como "Sin registro"
+            persona.estado_original = persona.estado;
+            persona.estado = 'Sin registro';
+        }
+    });
+    
+    // Recargar tabla
+    cargarTablaPersonasPrincipal();
+    
+    // Mostrar indicador de fecha
+    const fechaLabel = document.querySelector('.asistencia-fecha-actual') || (() => {
+        const span = document.createElement('span');
+        span.className = 'asistencia-fecha-actual';
+        const statsBar = document.querySelector('.stats-bar');
+        if (statsBar) statsBar.after(span);
+        return span;
+    })();
+    fechaLabel.innerHTML = `<i class="fas fa-clock"></i> Mostrando asistencia del: ${new Date(fechaStr).toLocaleDateString()}`;
+    
+    // Botón para restaurar estado actual
+    if (!document.getElementById('btnRestaurarHoy')) {
+        const btnRestaurar = document.createElement('button');
+        btnRestaurar.id = 'btnRestaurarHoy';
+        btnRestaurar.className = 'btn btn-sm btn-secondary';
+        btnRestaurar.innerHTML = '<i class="fas fa-undo"></i> Restaurar estado actual';
+        btnRestaurar.style.marginLeft = '1rem';
+        btnRestaurar.onclick = () => cargarAsistenciasPorFecha(new Date().toISOString().split('T')[0]);
+        fechaLabel.appendChild(btnRestaurar);
+    }
+}
+
+function guardarAsistenciaPorFecha(personaId, estado, fecha) {
+    const asistenciasHistorico = JSON.parse(localStorage.getItem('asistencias_historico') || '{}');
+    const key = `${personaId}_${fecha}`;
+    asistenciasHistorico[key] = estado;
+    localStorage.setItem('asistencias_historico', JSON.stringify(asistenciasHistorico));
+}
+
+function cambiarEstadoConFecha(personaId, nuevoEstado, fecha) {
+    const persona = listaPersonas.find(p => p.tarjeta_id === personaId);
+    if (persona) {
+        if (fecha === new Date().toISOString().split('T')[0]) {
+            // Fecha actual: actualizar estado real
+            persona.estado = nuevoEstado;
+            guardarPersonas();
+        } else {
+            // Fecha pasada: guardar en historial
+            guardarAsistenciaPorFecha(personaId, nuevoEstado, fecha);
+        }
+        cargarAsistenciasPorFecha(fecha);
+        mostrarNotificacion(`Estado cambiado a ${nuevoEstado} para la fecha ${fecha}`, 'success');
+    }
+}
+
+// ==================== EXPORTAR TABLA DE PERSONAS ====================
+
+function exportarPersonasExcel() {
+    const filtro = document.querySelector('#personas .filter-tab.active')?.dataset.filter || 'todos';
+    const searchTerm = document.getElementById('searchPersonas')?.value.toLowerCase() || '';
+    
+    let personasFiltradas = listaPersonas;
+    if (filtro !== 'todos') {
+        personasFiltradas = listaPersonas.filter(p => p.rol === filtro);
+    }
+    if (searchTerm) {
+        personasFiltradas = personasFiltradas.filter(p => 
+            p.nombre.toLowerCase().includes(searchTerm) || 
+            p.apellido.toLowerCase().includes(searchTerm)
+        );
+    }
+    
+    const datos = personasFiltradas.map(p => ({
+        'ID': p.tarjeta_id || p.id || '-',
+        'Nombre': p.nombre,
+        'Apellido': p.apellido,
+        'DNI': p.dni || '-',
+        'Rol': p.rol,
+        'Detalle': p.detalle || '-',
+        'Estado': p.estado || 'Presente',
+        'Fecha Registro': new Date(p.fecha_registro).toLocaleDateString()
+    }));
+    
+    if (datos.length === 0) {
+        mostrarNotificacion('No hay datos para exportar', 'warning');
+        return;
+    }
+    
+    const cabeceras = Object.keys(datos[0]);
+    let csv = cabeceras.join(',') + '\n';
+    datos.forEach(fila => {
+        const valores = cabeceras.map(cab => {
+            let valor = fila[cab] || '';
+            if (typeof valor === 'string' && (valor.includes(',') || valor.includes('"'))) {
+                valor = `"${valor.replace(/"/g, '""')}"`;
+            }
+            return valor;
+        });
+        csv += valores.join(',') + '\n';
+    });
+    
+    const blob = new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8;' });
+    const enlace = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    enlace.href = url;
+    enlace.setAttribute('download', `personas_${filtro}_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(enlace);
+    enlace.click();
+    document.body.removeChild(enlace);
+    URL.revokeObjectURL(url);
+    
+    mostrarNotificacion('Lista de personas exportada', 'success');
+}
+
+function exportarCursosExcel() {
+    const datos = listaCursos.map(curso => {
+        const cantidadAlumnos = listaPersonas.filter(p => p.rol === 'alumno' && p.detalle === `${curso.anio}° ${curso.division}`).length;
+        return {
+            'Año': `${curso.anio}° Año`,
+            'División': `${curso.division}ra División`,
+            'Cantidad Alumnos': cantidadAlumnos,
+            'Fecha Creación': new Date(curso.fechaCreacion).toLocaleDateString()
+        };
+    });
+    
+    if (datos.length === 0) {
+        mostrarNotificacion('No hay cursos para exportar', 'warning');
+        return;
+    }
+    
+    const cabeceras = Object.keys(datos[0]);
+    let csv = cabeceras.join(',') + '\n';
+    datos.forEach(fila => {
+        const valores = cabeceras.map(cab => fila[cab] || '');
+        csv += valores.join(',') + '\n';
+    });
+    
+    const blob = new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8;' });
+    const enlace = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    enlace.href = url;
+    enlace.setAttribute('download', `cursos_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(enlace);
+    enlace.click();
+    document.body.removeChild(enlace);
+    URL.revokeObjectURL(url);
+    
+    mostrarNotificacion('Lista de cursos exportada', 'success');
 }
 
 // ==================== INICIO DEL SISTEMA ====================

@@ -1526,3 +1526,140 @@ body {
 .clickable-row:hover {
     background: var(--light-color) !important;
 }
+
+/* ==================== NUEVAS CLASES PARA MEJORAS ==================== */
+
+/* Selector de fechas para historial de asistencia */
+.date-selector {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;
+    padding: 0.8rem;
+    background: var(--card-bg);
+    border-radius: 12px;
+}
+
+.date-selector label {
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.date-picker {
+    padding: 0.5rem 0.8rem;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--input-bg);
+    color: var(--text-color);
+}
+
+.btn-fecha {
+    background: var(--secondary-color);
+    color: white;
+    padding: 0.5rem 1rem;
+}
+
+/* Botones de exportación */
+.btn-excel {
+    background: #28a745;
+    color: white;
+}
+
+.btn-excel:hover {
+    background: #218838;
+}
+
+.export-buttons {
+    display: flex;
+    gap: 0.5rem;
+    margin-left: auto;
+}
+
+/* Badge para asistencia historial */
+.asistencia-historial {
+    background: var(--card-bg);
+    border-radius: 12px;
+    padding: 1rem;
+    margin-top: 1rem;
+}
+
+.asistencia-fecha-actual {
+    font-size: 0.8rem;
+    color: var(--primary-color);
+    margin-left: 0.5rem;
+}
+
+/* Modal de edición de persona */
+.edit-persona-modal .modal-content {
+    max-width: 600px;
+}
+
+.edit-field {
+    border: 1px solid var(--primary-color);
+    background: var(--input-bg);
+    padding: 0.3rem 0.6rem;
+    border-radius: 6px;
+    width: 100%;
+}
+
+.edit-field:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(52,152,219,0.2);
+}
+
+.foto-edit-preview {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    object-fit: cover;
+    margin-bottom: 0.5rem;
+    border: 2px solid var(--primary-color);
+}
+
+/* Indicador de carga en botones */
+.btn.loading {
+    opacity: 0.7;
+    pointer-events: none;
+}
+
+.btn.loading i {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+/* Toast de notificaciones */
+.toast-container {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.toast {
+    background: var(--card-bg);
+    color: var(--text-color);
+    padding: 0.8rem 1.2rem;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    animation: slideInRight 0.3s ease;
+    border-left: 4px solid var(--primary-color);
+}
+
+.toast.success { border-left-color: var(--success-color); }
+.toast.error { border-left-color: var(--danger-color); }
+.toast.warning { border-left-color: var(--warning-color); }
+
+@keyframes slideInRight {
+    from { transform: translateX(100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}

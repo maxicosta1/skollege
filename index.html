@@ -884,6 +884,78 @@
                     </div>
                 </div>
             </div>
+                        <!-- Modal de Editar Persona -->
+            <div id="editarPersonaModal" class="modal">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3><i class="fas fa-user-edit"></i> Editar Persona</h3>
+                        <button class="close-modal">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="formEditarPersona">
+                            <input type="hidden" id="editPersonaId">
+                            
+                            <div class="photo-upload-container">
+                                <div class="photo-preview">
+                                    <img id="editPreviewImage" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23bdc3c7'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E" alt="Foto" class="foto-edit-preview">
+                                </div>
+                                <div class="photo-upload-controls">
+                                    <label for="editFotoPerfil" class="btn btn-secondary btn-sm">
+                                        <i class="fas fa-camera"></i> Cambiar foto
+                                    </label>
+                                    <input type="file" id="editFotoPerfil" accept="image/*" style="display: none;">
+                                    <button type="button" id="btnEliminarFotoEdit" class="btn btn-cancel btn-sm">
+                                        <i class="fas fa-trash"></i> Eliminar
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label><i class="fas fa-user"></i> Nombre</label>
+                                    <input type="text" id="editNombre" required>
+                                </div>
+                                <div class="form-group">
+                                    <label><i class="fas fa-user-tag"></i> Apellido</label>
+                                    <input type="text" id="editApellido" required>
+                                </div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label><i class="fas fa-id-card"></i> DNI</label>
+                                <input type="text" id="editDni">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label><i class="fas fa-id-card"></i> Código Tarjeta</label>
+                                <input type="text" id="editTarjetaId" readonly style="background:#f0f0f0;">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label><i class="fas fa-user-cog"></i> Rol</label>
+                                <select id="editRol">
+                                    <option value="alumno">Alumno</option>
+                                    <option value="profesor">Profesor</option>
+                                    <option value="preceptor">Preceptor</option>
+                                    <option value="directivo">Directivo</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group" id="editCampoDinamico">
+                                <label id="editLabelDinamico"></label>
+                                <div id="editInputContainer"></div>
+                            </div>
+                            
+                            <div class="modal-actions">
+                                <button type="button" class="btn btn-cancel close-modal">Cancelar</button>
+                                <button type="submit" class="btn btn-primary">Guardar Cambios</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
         </main>
     </div>
 
