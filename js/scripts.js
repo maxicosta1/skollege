@@ -8,9 +8,9 @@
  * - Alumno: Solo ve "Anuncios"
  * - Profesor: Ve "Asistencias" y "Anuncios"
  * - Preceptor: Ve "Personas", "Cursos", "Asistencias", "Anuncios"
- * - Directivo: Ve todo (Personas, Cursos, Asistencias, Estadísticas, Usuarios, Administración, Anuncios)
+ * - Directivo: Ve todo (Personas, Cursos, Asistencias, Estadísticas, Usuarios, Administración, Anuncios, Profesores)
  * 
- * @version 4.1
+ * @version 5.0
  * ============================================================================
  */
 
@@ -35,14 +35,13 @@ let configuracionSistema = {
     autoSave: true
 };
 
+// Variables para nuevas funcionalidades
+let personaEditando = null;
+let nuevaFotoEdit = null;
+let fechaActualAsistencia = new Date().toISOString().split('T')[0];
+
 // ==================== FUNCIONES DE MODALES ====================
 
-/**
- * Muestra una notificación modal
- * @param {string} mensaje - Texto a mostrar
- * @param {string} tipo - 'info', 'success', 'error', 'warning'
- * @param {string|null} titulo - Título personalizado
- */
 function mostrarNotificacion(mensaje, tipo = 'info', titulo = null) {
     const modal = document.getElementById('notificationModal');
     const icon = document.getElementById('notificationIcon');
@@ -50,28 +49,23 @@ function mostrarNotificacion(mensaje, tipo = 'info', titulo = null) {
     const messageEl = document.getElementById('notificationMessage');
     
     let icono = 'fa-info-circle';
-    let claseTipo = 'notification-info';
     let tituloPorDefecto = 'Notificación';
     
     switch(tipo) {
         case 'success':
             icono = 'fa-check-circle';
-            claseTipo = 'notification-success';
             tituloPorDefecto = 'Éxito';
             break;
         case 'error':
             icono = 'fa-exclamation-circle';
-            claseTipo = 'notification-error';
             tituloPorDefecto = 'Error';
             break;
         case 'warning':
             icono = 'fa-exclamation-triangle';
-            claseTipo = 'notification-warning';
             tituloPorDefecto = 'Advertencia';
             break;
         default:
             icono = 'fa-info-circle';
-            claseTipo = 'notification-info';
             tituloPorDefecto = 'Información';
             break;
     }
@@ -93,12 +87,6 @@ function mostrarNotificacion(mensaje, tipo = 'info', titulo = null) {
     modal.querySelector('.close-modal')?.addEventListener('click', cerrar);
 }
 
-/**
- * Muestra un diálogo de confirmación
- * @param {string} mensaje 
- * @param {Function} callbackOk 
- * @param {Function} callbackCancel 
- */
 function mostrarConfirmacion(mensaje, callbackOk, callbackCancel = null) {
     const modal = document.getElementById('confirmModal');
     const messageEl = document.getElementById('confirmMessage');
@@ -133,10 +121,6 @@ function mostrarConfirmacion(mensaje, callbackOk, callbackCancel = null) {
     document.body.style.overflow = 'hidden';
 }
 
-/**
- * Muestra un modal de carga
- * @param {string} mensaje 
- */
 function mostrarCarga(mensaje = 'Procesando...') {
     const modal = document.getElementById('loadingModal');
     document.getElementById('loadingMessage').textContent = mensaje;
@@ -217,6 +201,7 @@ const SECCIONES = {
     anuncios: { id: 'anuncios', icono: 'fa-bullhorn', texto: 'Anuncios', roles: ['alumno', 'profesor', 'preceptor', 'directivo'] },
     personas: { id: 'personas', icono: 'fa-users', texto: 'Personas', roles: ['preceptor', 'directivo'] },
     cursos: { id: 'cursos', icono: 'fa-graduation-cap', texto: 'Cursos', roles: ['preceptor', 'directivo'] },
+    profesores: { id: 'profesores', icono: 'fa-chalkboard-teacher', texto: 'Profesores', roles: ['directivo'] },
     asistencias: { id: 'asistencias', icono: 'fa-clipboard-check', texto: 'Asistencias', roles: ['profesor', 'preceptor', 'directivo'] },
     estadisticas: { id: 'estadisticas', icono: 'fa-chart-pie', texto: 'Estadísticas', roles: ['directivo'] },
     usuariosGestion: { id: 'usuariosGestion', icono: 'fa-users-cog', texto: 'Usuarios', roles: ['directivo'] },
@@ -233,10 +218,6 @@ function obtenerSeccionesPorRol(rol) {
     return secciones;
 }
 
-/**
- * Refresca el contenido de la sección activa según su ID
- * @param {string} sectionId 
- */
 function refrescarSeccionActiva(sectionId) {
     switch(sectionId) {
         case 'anuncios':
@@ -258,8 +239,9 @@ function refrescarSeccionActiva(sectionId) {
         case 'usuariosGestion':
             if (usuarioActual?.rol === 'directivo') cargarTablaUsuariosGestion();
             break;
-        case 'administracion':
-            // No requiere carga dinámica
+        case 'profesores':
+            cargarTablaProfesores();
+            actualizarStatsProfesores();
             break;
         default:
             break;
@@ -267,29 +249,62 @@ function refrescarSeccionActiva(sectionId) {
 }
 
 function renderizarSidebar() {
-    const sidebarMenu = document.getElementById('sidebarMenu');
-    if (!sidebarMenu) return;
+    const sidebarMenuContainer = document.getElementById('sidebarMenuContainer');
+    if (!sidebarMenuContainer) return;
     
     if (!usuarioActual) {
-        sidebarMenu.innerHTML = '<li style="padding: 1rem; text-align: center; color: rgba(255,255,255,0.5);">Inicie sesión para ver las opciones</li>';
+        sidebarMenuContainer.innerHTML = '<div style="padding: 1rem; text-align: center; color: rgba(255,255,255,0.5);">Inicie sesión para ver las opciones</div>';
         return;
     }
     
     const secciones = obtenerSeccionesPorRol(usuarioActual.rol);
     
     if (secciones.length === 0) {
-        sidebarMenu.innerHTML = '<li style="padding: 1rem; text-align: center; color: rgba(255,255,255,0.5);">Sin opciones disponibles</li>';
+        sidebarMenuContainer.innerHTML = '<div style="padding: 1rem; text-align: center; color: rgba(255,255,255,0.5);">Sin opciones disponibles</div>';
         return;
     }
     
-    sidebarMenu.innerHTML = secciones.map(seccion => `
-        <li>
-            <a href="#${seccion.id}" class="nav-link" data-section="${seccion.id}">
-                <i class="fas ${seccion.icono}"></i>
-                <span>${seccion.texto}</span>
-            </a>
-        </li>
-    `).join('');
+    const grupos = {
+        principal: { titulo: 'Sistema Escolar', items: ['anuncios', 'asistencias'] },
+        gestion: { titulo: 'Gestión', items: ['personas', 'cursos', 'profesores'] },
+        analisis: { titulo: 'Análisis', items: ['estadisticas', 'usuariosGestion'] },
+        sistema: { titulo: 'Sistema', items: ['administracion'] }
+    };
+    
+    const getSeccionInfo = (id) => {
+        const seccion = SECCIONES[id];
+        return seccion ? { icono: seccion.icono, texto: seccion.texto } : null;
+    };
+    
+    let html = '';
+    
+    for (const [grupoKey, grupo] of Object.entries(grupos)) {
+        const itemsDelGrupo = grupo.items.filter(itemId => secciones.some(s => s.id === itemId));
+        if (itemsDelGrupo.length === 0) continue;
+        
+        html += `<div class="nav-section">`;
+        html += `<div class="nav-section-title">${grupo.titulo}</div>`;
+        html += `<ul>`;
+        
+        itemsDelGrupo.forEach(itemId => {
+            const info = getSeccionInfo(itemId);
+            if (info) {
+                html += `
+                    <li>
+                        <a href="#${itemId}" class="nav-link" data-section="${itemId}">
+                            <i class="fas ${info.icono}"></i>
+                            <span>${info.texto}</span>
+                        </a>
+                    </li>
+                `;
+            }
+        });
+        
+        html += `</ul>`;
+        html += `</div>`;
+    }
+    
+    sidebarMenuContainer.innerHTML = html;
     
     document.querySelectorAll('.nav-link').forEach(link => {
         link.addEventListener('click', function(e) {
@@ -300,7 +315,6 @@ function renderizarSidebar() {
             const sectionId = this.getAttribute('data-section');
             const targetSection = document.getElementById(sectionId);
             if (targetSection) targetSection.classList.add('active');
-            // Refrescar datos de la sección al mostrarla
             refrescarSeccionActiva(sectionId);
             if (window.innerWidth < 992) cerrarSidebar();
         });
@@ -308,18 +322,50 @@ function renderizarSidebar() {
     
     const primeraSeccion = secciones[0]?.id;
     if (primeraSeccion) {
-        document.querySelectorAll('.section').forEach(section => section.classList.remove('active'));
-        document.getElementById(primeraSeccion).classList.add('active');
+        const seccionActiva = document.getElementById(primeraSeccion);
+        if (seccionActiva && !seccionActiva.classList.contains('active')) {
+            document.querySelectorAll('.section').forEach(section => section.classList.remove('active'));
+            seccionActiva.classList.add('active');
+        }
         const activeLink = document.querySelector(`.nav-link[data-section="${primeraSeccion}"]`);
         if (activeLink) activeLink.classList.add('active');
         refrescarSeccionActiva(primeraSeccion);
     }
+    
+    hacerSidebarColapsable();
 }
 
 function cerrarSidebar() {
     document.getElementById('sidebar')?.classList.remove('active');
     document.getElementById('overlay')?.classList.remove('active');
     document.body.style.overflow = 'auto';
+}
+
+function hacerSidebarColapsable() {
+    document.querySelectorAll('.nav-section').forEach(section => {
+        const title = section.querySelector('.nav-section-title');
+        const ul = section.querySelector('ul');
+        
+        if (title && ul && !title.hasAttribute('data-collapsible-setup')) {
+            title.setAttribute('data-collapsible-setup', 'true');
+            title.style.cursor = 'pointer';
+            title.style.display = 'flex';
+            title.style.justifyContent = 'space-between';
+            title.style.alignItems = 'center';
+            
+            const iconSpan = document.createElement('span');
+            iconSpan.innerHTML = '<i class="fas fa-chevron-down" style="font-size: 0.6rem;"></i>';
+            title.appendChild(iconSpan);
+            
+            let collapsed = false;
+            title.addEventListener('click', (e) => {
+                e.stopPropagation();
+                collapsed = !collapsed;
+                ul.style.display = collapsed ? 'none' : 'block';
+                iconSpan.innerHTML = collapsed ? '<i class="fas fa-chevron-right" style="font-size: 0.6rem;"></i>' : '<i class="fas fa-chevron-down" style="font-size: 0.6rem;"></i>';
+            });
+        }
+    });
 }
 
 // ==================== LOGIN ====================
@@ -341,7 +387,7 @@ function inicializarLogin() {
             if (usuarioEncontrado) {
                 usuarioActual = {
                     usuario: usuarioEncontrado.usuario,
-                    rol: usuarioEncontrado.rol,
+                    rol: usuarioEncontrado.rol.toLowerCase(),
                     id_persona: usuarioEncontrado.id_persona
                 };
                 localStorage.setItem('usuarioActual', JSON.stringify(usuarioActual));
@@ -382,22 +428,8 @@ function cargarAnuncios() {
         listaAnuncios = JSON.parse(stored);
     } else {
         listaAnuncios = [
-            {
-                id: 1,
-                titulo: 'Bienvenidos al ciclo lectivo 2024',
-                contenido: 'Se informa a toda la comunidad educativa que el ciclo lectivo dará inicio el día 1 de marzo.',
-                visibilidad: 'todos',
-                autor: 'Dirección',
-                fecha: new Date().toISOString()
-            },
-            {
-                id: 2,
-                titulo: 'Reunión de padres',
-                contenido: 'Se convoca a reunión de padres el día viernes 15 a las 18:00 hs en el salón de actos.',
-                visibilidad: 'todos',
-                autor: 'Preceptoría',
-                fecha: new Date().toISOString()
-            }
+            { id: 1, titulo: 'Bienvenidos al ciclo lectivo 2024', contenido: 'Se informa a toda la comunidad educativa que el ciclo lectivo dará inicio el día 1 de marzo.', visibilidad: 'todos', autor: 'Dirección', fecha: new Date().toISOString() },
+            { id: 2, titulo: 'Reunión de padres', contenido: 'Se convoca a reunión de padres el día viernes 15 a las 18:00 hs en el salón de actos.', visibilidad: 'todos', autor: 'Preceptoría', fecha: new Date().toISOString() }
         ];
         localStorage.setItem('anuncios', JSON.stringify(listaAnuncios));
     }
@@ -470,10 +502,6 @@ function crearAnuncio(titulo, contenido, visibilidad) {
 
 // ==================== GESTIÓN DE PERSONAS ====================
 
-/**
- * Carga la tabla simplificada de personas (sección "Personas")
- * @param {string} filtro - 'todos', 'alumno', 'profesor', 'preceptor'
- */
 function cargarTablaPersonasSimplificada(filtro = 'todos') {
     const tbody = document.getElementById('personasTableBody_personas');
     if (!tbody) return;
@@ -507,11 +535,12 @@ function cargarTablaPersonasSimplificada(filtro = 'todos') {
     document.querySelectorAll('.ver-ficha-persona').forEach(btn => {
         btn.addEventListener('click', (e) => { e.stopPropagation(); mostrarFichaAlumno(btn.getAttribute('data-id')); });
     });
+    
+    document.querySelectorAll('.editar-persona').forEach(btn => {
+        btn.addEventListener('click', (e) => { e.stopPropagation(); abrirModalEditarPersona(btn.getAttribute('data-id')); });
+    });
 }
 
-/**
- * Carga la tabla principal de personas (sección "Asistencias") con paginación
- */
 function cargarTablaPersonasPrincipal() {
     const tbody = document.getElementById('personasTableBody_asistencias');
     if (!tbody) return;
@@ -534,47 +563,31 @@ function cargarTablaPersonasPrincipal() {
                 <td><span class="status ${persona.estado === 'Presente' ? 'active' : 'inactive'}">${persona.estado}</span></td>
                 <td>${new Date(persona.fecha_registro).toLocaleDateString()}</td>
                 <td>
-                    <!-- ========== AQUÍ VA EL BLOQUE DE ACCIONES ========== -->
                     <button class="btn-icon ver-ficha-asistencia" data-id="${persona.tarjeta_id}"><i class="fas fa-id-card"></i></button>
                     ${(usuarioActual?.rol === 'directivo' || usuarioActual?.rol === 'preceptor') ? `
                         <button class="btn-icon editar-persona" data-id="${persona.tarjeta_id}"><i class="fas fa-edit"></i></button>
                         <button class="btn-icon eliminar-persona" data-id="${persona.tarjeta_id}"><i class="fas fa-trash"></i></button>
                     ` : ''}
-                    <!-- ========== FIN DEL BLOQUE ========== -->
                 </td>
             </tr>
         `).join('');
     }
     
-    // Actualizar contadores y paginación
     document.getElementById('personasCount').textContent = datosFiltrados.length;
     document.getElementById('totalCount').textContent = listaPersonas.length;
     document.getElementById('currentPage').textContent = currentPage;
     document.getElementById('prevPage').disabled = currentPage === 1;
     document.getElementById('nextPage').disabled = start + itemsPerPage >= datosFiltrados.length;
     
-    // Event listeners para los botones (ver ficha, editar, eliminar)
     document.querySelectorAll('.ver-ficha-asistencia').forEach(btn => {
         btn.addEventListener('click', (e) => { e.stopPropagation(); mostrarFichaAlumno(btn.getAttribute('data-id')); });
     });
     
-    // 👇 IMPORTANTE: Agregar event listener para los botones editar-persona
     document.querySelectorAll('.editar-persona').forEach(btn => {
-        btn.addEventListener('click', (e) => { 
-            e.stopPropagation(); 
-            abrirModalEditarPersona(btn.getAttribute('data-id')); 
-        });
-    });
-    
-    document.querySelectorAll('.eliminar-persona').forEach(btn => {
-        btn.addEventListener('click', (e) => { e.stopPropagation(); /* función eliminar */ });
+        btn.addEventListener('click', (e) => { e.stopPropagation(); abrirModalEditarPersona(btn.getAttribute('data-id')); });
     });
 }
 
-/**
- * Filtra personas según búsqueda y filtro de rol
- * @returns {Array} Personas filtradas
- */
 function filtrarPersonas() {
     const searchInput = document.getElementById('searchInput');
     const termino = searchInput?.value.toLowerCase() || '';
@@ -852,6 +865,437 @@ function imprimirEstadisticas() {
     window.print();
 }
 
+// ==================== PROFESORES (DEFINIDO ANTES DE cargarDatosIniciales) ====================
+
+let listaProfesores = [];
+let profesorEditando = null;
+let materiasTemp = [];
+let horarioTemp = [];
+const diasSemana = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+
+function cargarDatosProfesores() {
+    const stored = localStorage.getItem('profesores');
+    if (stored) {
+        listaProfesores = JSON.parse(stored);
+    } else {
+        listaProfesores = [
+            {
+                id: '1',
+                nombre: 'Carlos',
+                apellido: 'López',
+                email: 'carlos.lopez@escuela.edu',
+                telefono: '1234-5678',
+                dni: '87654321',
+                fechaIngreso: '2023-03-01',
+                foto: null,
+                estado: 'activo',
+                materias: ['Matemáticas', 'Álgebra'],
+                horario: [
+                    { dia: 'Lunes', hora: '08:00 - 10:00', materia: 'Matemáticas' },
+                    { dia: 'Miércoles', hora: '10:00 - 12:00', materia: 'Álgebra' }
+                ]
+            },
+            {
+                id: '2',
+                nombre: 'Laura',
+                apellido: 'Martínez',
+                email: 'laura.martinez@escuela.edu',
+                telefono: '8765-4321',
+                dni: '12345678',
+                fechaIngreso: '2023-03-01',
+                foto: null,
+                estado: 'activo',
+                materias: ['Lengua', 'Literatura'],
+                horario: [
+                    { dia: 'Martes', hora: '08:00 - 10:00', materia: 'Lengua' },
+                    { dia: 'Jueves', hora: '10:00 - 12:00', materia: 'Literatura' }
+                ]
+            }
+        ];
+        guardarProfesores();
+    }
+    actualizarStatsProfesores();
+    cargarTablaProfesores();
+}
+
+function guardarProfesores() {
+    localStorage.setItem('profesores', JSON.stringify(listaProfesores));
+}
+
+function actualizarStatsProfesores() {
+    const total = listaProfesores.length;
+    const totalMaterias = listaProfesores.reduce((sum, p) => sum + (p.materias?.length || 0), 0);
+    const totalHoras = listaProfesores.reduce((sum, p) => sum + (p.horario?.length || 0), 0);
+    
+    const statsTotal = document.getElementById('totalProfesoresStats');
+    const statsMaterias = document.getElementById('totalMateriasStats');
+    const statsHoras = document.getElementById('totalHorasStats');
+    
+    if (statsTotal) statsTotal.textContent = total;
+    if (statsMaterias) statsMaterias.textContent = totalMaterias;
+    if (statsHoras) statsHoras.textContent = totalHoras;
+}
+
+function cargarTablaProfesores() {
+    const tbody = document.getElementById('profesoresTableBody');
+    if (!tbody) return;
+    
+    const filtro = document.querySelector('#profesoresFiltros .filter-tab.active')?.dataset.filter || 'todos';
+    const searchTerm = document.getElementById('searchProfesores')?.value.toLowerCase() || '';
+    
+    let profesoresFiltrados = [...listaProfesores];
+    
+    if (filtro !== 'todos') {
+        profesoresFiltrados = profesoresFiltrados.filter(p => p.estado === filtro);
+    }
+    if (searchTerm) {
+        profesoresFiltrados = profesoresFiltrados.filter(p => 
+            p.nombre.toLowerCase().includes(searchTerm) || 
+            p.apellido.toLowerCase().includes(searchTerm) ||
+            (p.email && p.email.toLowerCase().includes(searchTerm))
+        );
+    }
+    
+    if (profesoresFiltrados.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9" style="text-align: center;">No hay profesores registrados</td></tr>';
+        return;
+    }
+    
+    tbody.innerHTML = profesoresFiltrados.map(profesor => `
+        <tr class="clickable-row" data-id="${profesor.id}">
+            <td>${profesor.foto ? `<img src="${profesor.foto}" class="user-thumb">` : '<i class="fas fa-user-circle" style="font-size: 35px; color: #bdc3c7;"></i>'}</td>
+            <td>${profesor.id}</td>
+            <td>${profesor.nombre}</td>
+            <td>${profesor.apellido}</td>
+            <td>${profesor.email || '-'}</td>
+            <td>${profesor.telefono || '-'}</td>
+            <td>${profesor.materias?.length || 0} materias</td>
+            <td><span class="status ${profesor.estado === 'activo' ? 'active' : 'inactive'}">${profesor.estado === 'activo' ? 'Activo' : 'Inactivo'}</span></td>
+            <td>
+                <button class="btn-icon ver-perfil-profesor" data-id="${profesor.id}"><i class="fas fa-id-card"></i></button>
+                <button class="btn-icon editar-profesor" data-id="${profesor.id}"><i class="fas fa-edit"></i></button>
+                <button class="btn-icon eliminar-profesor" data-id="${profesor.id}"><i class="fas fa-trash"></i></button>
+            </td>
+        </tr>
+    `).join('');
+    
+    document.querySelectorAll('.ver-perfil-profesor').forEach(btn => {
+        btn.addEventListener('click', (e) => { e.stopPropagation(); verPerfilProfesor(btn.getAttribute('data-id')); });
+    });
+    document.querySelectorAll('.editar-profesor').forEach(btn => {
+        btn.addEventListener('click', (e) => { e.stopPropagation(); editarProfesor(btn.getAttribute('data-id')); });
+    });
+    document.querySelectorAll('.eliminar-profesor').forEach(btn => {
+        btn.addEventListener('click', (e) => { e.stopPropagation(); eliminarProfesor(btn.getAttribute('data-id')); });
+    });
+}
+
+function abrirModalNuevoProfesor() {
+    profesorEditando = null;
+    materiasTemp = [];
+    horarioTemp = [];
+    
+    const titleEl = document.getElementById('profesorModalTitle');
+    if (titleEl) titleEl.textContent = 'Nuevo Profesor';
+    
+    document.getElementById('profesorId').value = '';
+    document.getElementById('profesorNombre').value = '';
+    document.getElementById('profesorApellido').value = '';
+    document.getElementById('profesorEmail').value = '';
+    document.getElementById('profesorTelefono').value = '';
+    document.getElementById('profesorDni').value = '';
+    document.getElementById('profesorFechaIngreso').value = new Date().toISOString().split('T')[0];
+    document.getElementById('profesorEstado').value = 'activo';
+    document.getElementById('profesorPreviewImage').src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23bdc3c7'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E";
+    
+    renderizarMateriasTemp();
+    renderizarHorarioTemp();
+    
+    mostrarModal('profesorModal');
+}
+
+function editarProfesor(id) {
+    const profesor = listaProfesores.find(p => p.id === id);
+    if (!profesor) return;
+    
+    profesorEditando = profesor;
+    materiasTemp = [...(profesor.materias || [])];
+    horarioTemp = [...(profesor.horario || [])];
+    
+    const titleEl = document.getElementById('profesorModalTitle');
+    if (titleEl) titleEl.textContent = 'Editar Profesor';
+    
+    document.getElementById('profesorId').value = profesor.id;
+    document.getElementById('profesorNombre').value = profesor.nombre;
+    document.getElementById('profesorApellido').value = profesor.apellido;
+    document.getElementById('profesorEmail').value = profesor.email || '';
+    document.getElementById('profesorTelefono').value = profesor.telefono || '';
+    document.getElementById('profesorDni').value = profesor.dni || '';
+    document.getElementById('profesorFechaIngreso').value = profesor.fechaIngreso || '';
+    document.getElementById('profesorEstado').value = profesor.estado || 'activo';
+    document.getElementById('profesorPreviewImage').src = profesor.foto || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23bdc3c7'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E";
+    
+    renderizarMateriasTemp();
+    renderizarHorarioTemp();
+    
+    mostrarModal('profesorModal');
+}
+
+function renderizarMateriasTemp() {
+    const container = document.getElementById('materiasContainer');
+    if (!container) return;
+    
+    if (materiasTemp.length === 0) {
+        container.innerHTML = '<div style="text-align: center; padding: 0.5rem; color: #6c757d;">No hay materias agregadas</div>';
+        return;
+    }
+    
+    container.innerHTML = materiasTemp.map((materia, index) => `
+        <div class="materia-item">
+            <span class="materia-nombre">${materia}</span>
+            <button type="button" class="materia-eliminar" data-index="${index}">
+                <i class="fas fa-trash"></i>
+            </button>
+        </div>
+    `).join('');
+    
+    document.querySelectorAll('.materia-eliminar').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const index = parseInt(btn.getAttribute('data-index'));
+            materiasTemp.splice(index, 1);
+            renderizarMateriasTemp();
+        });
+    });
+}
+
+function renderizarHorarioTemp() {
+    const container = document.getElementById('horarioContainer');
+    if (!container) return;
+    
+    if (horarioTemp.length === 0) {
+        container.innerHTML = '<div style="text-align: center; padding: 0.5rem; color: #6c757d;">No hay horarios agregados</div>';
+        return;
+    }
+    
+    container.innerHTML = horarioTemp.map((item, index) => `
+        <div class="horario-row">
+            <select class="horario-dia" data-index="${index}" data-field="dia">
+                ${diasSemana.map(dia => `<option value="${dia}" ${item.dia === dia ? 'selected' : ''}>${dia}</option>`).join('')}
+            </select>
+            <input type="text" class="horario-hora" value="${item.hora}" placeholder="Ej: 08:00 - 10:00" data-index="${index}" data-field="hora">
+            <input type="text" class="horario-materia" value="${item.materia}" placeholder="Materia" data-index="${index}" data-field="materia" style="flex:1; padding:0.3rem; border:1px solid var(--border-color); border-radius:6px;">
+            <button type="button" class="btn-eliminar-horario" data-index="${index}">
+                <i class="fas fa-trash"></i>
+            </button>
+        </div>
+    `).join('');
+    
+    document.querySelectorAll('.horario-dia, .horario-hora, .horario-materia').forEach(input => {
+        input.addEventListener('change', function() {
+            const index = parseInt(this.getAttribute('data-index'));
+            const field = this.getAttribute('data-field');
+            if (horarioTemp[index]) {
+                horarioTemp[index][field] = this.value;
+            }
+        });
+    });
+    
+    document.querySelectorAll('.btn-eliminar-horario').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const index = parseInt(btn.getAttribute('data-index'));
+            horarioTemp.splice(index, 1);
+            renderizarHorarioTemp();
+        });
+    });
+}
+
+function agregarMateria() {
+    const nuevaMateria = prompt('Ingrese el nombre de la materia:');
+    if (nuevaMateria && nuevaMateria.trim()) {
+        materiasTemp.push(nuevaMateria.trim());
+        renderizarMateriasTemp();
+    }
+}
+
+function agregarHorario() {
+    horarioTemp.push({ dia: 'Lunes', hora: '08:00 - 10:00', materia: '' });
+    renderizarHorarioTemp();
+}
+
+async function guardarProfesor(e) {
+    e.preventDefault();
+    
+    const id = document.getElementById('profesorId').value;
+    const nombre = document.getElementById('profesorNombre').value;
+    const apellido = document.getElementById('profesorApellido').value;
+    const email = document.getElementById('profesorEmail').value;
+    const telefono = document.getElementById('profesorTelefono').value;
+    const dni = document.getElementById('profesorDni').value;
+    const fechaIngreso = document.getElementById('profesorFechaIngreso').value;
+    const estado = document.getElementById('profesorEstado').value;
+    
+    if (!nombre || !apellido) {
+        mostrarNotificacion('Complete nombre y apellido', 'warning');
+        return;
+    }
+    
+    let foto = null;
+    const fotoInput = document.getElementById('profesorFoto');
+    if (fotoInput.files && fotoInput.files[0]) {
+        mostrarCarga('Procesando imagen...');
+        try {
+            foto = await convertirImagenABase64(fotoInput.files[0]);
+            ocultarCarga();
+        } catch (error) {
+            ocultarCarga();
+            mostrarNotificacion('Error al procesar la imagen', 'error');
+        }
+    } else if (profesorEditando && profesorEditando.foto) {
+        foto = profesorEditando.foto;
+    }
+    
+    const profesorData = {
+        id: id || Date.now().toString(),
+        nombre,
+        apellido,
+        email,
+        telefono,
+        dni,
+        fechaIngreso,
+        estado,
+        foto,
+        materias: materiasTemp,
+        horario: horarioTemp
+    };
+    
+    if (id) {
+        const index = listaProfesores.findIndex(p => p.id === id);
+        if (index !== -1) listaProfesores[index] = profesorData;
+    } else {
+        listaProfesores.push(profesorData);
+    }
+    
+    guardarProfesores();
+    actualizarStatsProfesores();
+    cargarTablaProfesores();
+    cerrarModal('profesorModal');
+    mostrarNotificacion('Profesor guardado correctamente', 'success');
+}
+
+function eliminarProfesor(id) {
+    mostrarConfirmacion('¿Eliminar este profesor?', () => {
+        listaProfesores = listaProfesores.filter(p => p.id !== id);
+        guardarProfesores();
+        actualizarStatsProfesores();
+        cargarTablaProfesores();
+        mostrarNotificacion('Profesor eliminado', 'success');
+    });
+}
+
+function verPerfilProfesor(id) {
+    const profesor = listaProfesores.find(p => p.id === id);
+    if (!profesor) return;
+    
+    document.getElementById('perfilProfesorNombre').textContent = `${profesor.nombre} ${profesor.apellido}`;
+    document.getElementById('perfilProfesorEmail').textContent = profesor.email || '-';
+    document.getElementById('perfilProfesorTelefono').textContent = profesor.telefono || '-';
+    document.getElementById('perfilProfesorDni').textContent = profesor.dni || '-';
+    document.getElementById('perfilProfesorFechaIngreso').textContent = profesor.fechaIngreso ? new Date(profesor.fechaIngreso).toLocaleDateString() : '-';
+    document.getElementById('perfilProfesorEstado').textContent = profesor.estado === 'activo' ? 'Activo' : 'Inactivo';
+    document.getElementById('perfilProfesorEstado').className = `status ${profesor.estado === 'activo' ? 'active' : 'inactive'}`;
+    document.getElementById('perfilProfesorFoto').src = profesor.foto || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23bdc3c7'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E";
+    
+    const materiasContainer = document.getElementById('perfilMateriasList');
+    if (profesor.materias && profesor.materias.length > 0) {
+        materiasContainer.innerHTML = profesor.materias.map(m => `<span class="materia-badge">${m}</span>`).join('');
+    } else {
+        materiasContainer.innerHTML = '<span class="materia-badge">Sin materias asignadas</span>';
+    }
+    
+    const horarioContainer = document.getElementById('perfilHorarioTable');
+    if (profesor.horario && profesor.horario.length > 0) {
+        horarioContainer.innerHTML = `
+            <table class="horario-table">
+                <thead><tr><th>Día</th><th>Horario</th><th>Materia</th></tr></thead>
+                <tbody>
+                    ${profesor.horario.map(h => `<tr><td>${h.dia}</td><td>${h.hora}</td><td>${h.materia || '-'}</td></tr>`).join('')}
+                </tbody>
+            </table>
+        `;
+    } else {
+        horarioContainer.innerHTML = '<p>No hay horario registrado</p>';
+    }
+    
+    const btnEditar = document.getElementById('btnEditarPerfilProfesor');
+    const btnEliminar = document.getElementById('btnEliminarPerfilProfesor');
+    const btnAsistencia = document.getElementById('btnAsistenciaProfesor');
+    
+    if (btnEditar) btnEditar.onclick = () => {
+        cerrarModal('perfilProfesorModal');
+        editarProfesor(id);
+    };
+    if (btnEliminar) btnEliminar.onclick = () => {
+        cerrarModal('perfilProfesorModal');
+        eliminarProfesor(id);
+    };
+    if (btnAsistencia) btnAsistencia.onclick = () => {
+        cerrarModal('perfilProfesorModal');
+        const asistenciaLink = document.querySelector('.nav-link[data-section="asistencias"]');
+        if (asistenciaLink) asistenciaLink.click();
+        const searchInput = document.getElementById('searchInput');
+        if (searchInput) {
+            searchInput.value = `${profesor.nombre} ${profesor.apellido}`;
+            searchInput.dispatchEvent(new Event('input'));
+        }
+    };
+    
+    mostrarModal('perfilProfesorModal');
+}
+
+function exportarProfesoresExcel() {
+    const datos = listaProfesores.map(p => ({
+        'ID': p.id,
+        'Nombre': p.nombre,
+        'Apellido': p.apellido,
+        'Email': p.email || '-',
+        'Teléfono': p.telefono || '-',
+        'DNI': p.dni || '-',
+        'Materias': (p.materias || []).join(', '),
+        'Horas/Semana': p.horario?.length || 0,
+        'Estado': p.estado === 'activo' ? 'Activo' : 'Inactivo'
+    }));
+    
+    if (datos.length === 0) {
+        mostrarNotificacion('No hay datos para exportar', 'warning');
+        return;
+    }
+    
+    const cabeceras = Object.keys(datos[0]);
+    let csv = cabeceras.join(',') + '\n';
+    datos.forEach(fila => {
+        const valores = cabeceras.map(cab => {
+            let valor = fila[cab] || '';
+            if (typeof valor === 'string' && (valor.includes(',') || valor.includes('"'))) {
+                valor = `"${valor.replace(/"/g, '""')}"`;
+            }
+            return valor;
+        });
+        csv += valores.join(',') + '\n';
+    });
+    
+    const blob = new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8;' });
+    const enlace = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    enlace.href = url;
+    enlace.setAttribute('download', `profesores_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(enlace);
+    enlace.click();
+    document.body.removeChild(enlace);
+    URL.revokeObjectURL(url);
+    
+    mostrarNotificacion('Lista de profesores exportada', 'success');
+}
+
 // ==================== FUNCIONES DE INICIALIZACIÓN ====================
 
 function guardarPersonas() { localStorage.setItem('personas', JSON.stringify(listaPersonas)); }
@@ -900,6 +1344,8 @@ function cargarDatosIniciales() {
     
     const storedUsuario = localStorage.getItem('usuarioActual');
     if (storedUsuario) usuarioActual = JSON.parse(storedUsuario);
+
+    cargarDatosProfesores();
 }
 
 function actualizarUIporSesion() {
@@ -928,14 +1374,15 @@ function actualizarUIporSesion() {
         
         renderizarSidebar();
         
-        // Carga inicial de datos según rol
         if (usuarioActual.rol === 'directivo') {
             cargarTablaUsuariosGestion();
             cargarEstadisticasDetalladas();
             cargarTablaPersonasSimplificada();
             cargarTablaCursos();
             cargarTablaPersonasPrincipal();
+            cargarTablaProfesores();
             actualizarEstadisticasRapidas();
+            actualizarStatsProfesores();
         } else if (usuarioActual.rol === 'preceptor') {
             cargarTablaPersonasSimplificada();
             cargarTablaCursos();
@@ -965,9 +1412,9 @@ function actualizarUIporSesion() {
         if (btnLoginHeader) btnLoginHeader.style.display = 'flex';
         if (sidebar) sidebar.classList.remove('active');
         
-        const sidebarMenu = document.getElementById('sidebarMenu');
-        if (sidebarMenu) {
-            sidebarMenu.innerHTML = '<li style="padding: 1rem; text-align: center; color: rgba(255,255,255,0.5);">Inicie sesión para continuar</li>';
+        const sidebarMenuContainer = document.getElementById('sidebarMenuContainer');
+        if (sidebarMenuContainer) {
+            sidebarMenuContainer.innerHTML = '<div style="padding: 1rem; text-align: center; color: rgba(255,255,255,0.5);">Inicie sesión para continuar</div>';
         }
     }
 }
@@ -1177,287 +1624,7 @@ function manejarEnvioNuevaPersona(e) {
     cerrarModal('nuevoAlumnoModal');
 }
 
-// ==================== INICIALIZACIÓN DE EVENTOS ====================
-
-function inicializarEventListeners() {
-
-        // Exportar personas (sección Personas)
-    const exportarPersonasBtn = document.createElement('button');
-    exportarPersonasBtn.innerHTML = '<i class="fas fa-file-excel"></i> Exportar Excel';
-    exportarPersonasBtn.className = 'btn btn-excel btn-sm';
-    exportarPersonasBtn.onclick = exportarPersonasExcel;
-    document.querySelector('#personas .action-group')?.appendChild(exportarPersonasBtn);
-    
-    // Exportar cursos (sección Cursos)
-    const exportarCursosBtn = document.createElement('button');
-    exportarCursosBtn.innerHTML = '<i class="fas fa-file-excel"></i> Exportar Excel';
-    exportarCursosBtn.className = 'btn btn-excel btn-sm';
-    exportarCursosBtn.onclick = exportarCursosExcel;
-    document.querySelector('#cursos .action-group')?.appendChild(exportarCursosBtn);
-    
-    // Selector de fecha para historial de asistencia
-    document.getElementById('btnCargarAsistenciaFecha')?.addEventListener('click', () => {
-        const fecha = document.getElementById('fechaAsistencia').value;
-        if (fecha) {
-            fechaActualAsistencia = fecha;
-            cargarAsistenciasPorFecha(fecha);
-        }
-    });
-    
-    document.getElementById('btnHoy')?.addEventListener('click', () => {
-        const hoy = new Date().toISOString().split('T')[0];
-        document.getElementById('fechaAsistencia').value = hoy;
-        fechaActualAsistencia = hoy;
-        // Restaurar estados reales
-        listaPersonas.forEach(p => {
-            if (p.estado_original) {
-                p.estado = p.estado_original;
-                delete p.estado_original;
-            }
-        });
-        guardarPersonas();
-        cargarAsistenciasPorFecha(hoy);
-    });
-    
-    document.getElementById('btnExportarAsistenciaExcel')?.addEventListener('click', exportarAsistenciaExcel);
-    
-    // Formulario de editar persona
-    document.getElementById('formEditarPersona')?.addEventListener('submit', guardarEdicionPersona);
-    document.getElementById('editFotoPerfil')?.addEventListener('change', (e) => {
-        if (e.target.files?.[0]) manejarFotoEdit(e.target.files[0]);
-    });
-    document.getElementById('btnEliminarFotoEdit')?.addEventListener('click', () => {
-        nuevaFotoEdit = null;
-        document.getElementById('editPreviewImage').src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23bdc3c7'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E";
-        mostrarNotificacion('Foto eliminada', 'info');
-    });
-    document.getElementById('editRol')?.addEventListener('change', function() {
-        configurarCampoDinamicoEdicion(this.value, '');
-    });
-    
-    // Modificar el event listener de cambio de estado en ficha para usar fecha
-    const btnCambiarEstadoOriginal = document.getElementById('btnCambiarEstado');
-    if (btnCambiarEstadoOriginal) {
-        const nuevoBtn = btnCambiarEstadoOriginal.cloneNode(true);
-        btnCambiarEstadoOriginal.parentNode.replaceChild(nuevoBtn, btnCambiarEstadoOriginal);
-        nuevoBtn.addEventListener('click', () => {
-            if (personaActualFicha) {
-                const nuevoEstado = personaActualFicha.estado === 'Presente' ? 'Ausente' : 'Presente';
-                const fechaActual = fechaActualAsistencia || new Date().toISOString().split('T')[0];
-                mostrarConfirmacion(`¿Cambiar estado a ${nuevoEstado} para el día ${fechaActual}?`, () => {
-                    cambiarEstadoConFecha(personaActualFicha.tarjeta_id, nuevoEstado, fechaActual);
-                    cargarAsistenciasPorFecha(fechaActual);
-                    mostrarFichaAlumno(personaActualFicha.tarjeta_id);
-                });
-            }
-        });
-    }
-
-    const menuToggle = document.getElementById('menuToggle');
-    const closeSidebar = document.getElementById('closeSidebar');
-    const overlay = document.getElementById('overlay');
-    
-    menuToggle?.addEventListener('click', () => {
-        document.getElementById('sidebar').classList.add('active');
-        overlay.classList.add('active');
-        document.body.style.overflow = 'hidden';
-    });
-    
-    const cerrar = () => {
-        document.getElementById('sidebar').classList.remove('active');
-        overlay?.classList.remove('active');
-        document.body.style.overflow = 'auto';
-    };
-    closeSidebar?.addEventListener('click', cerrar);
-    overlay?.addEventListener('click', cerrar);
-    
-    document.getElementById('btnLogoutHeader')?.addEventListener('click', cerrarSesion);
-    document.getElementById('btnConfiguracion')?.addEventListener('click', () => mostrarModal('configuracionModal'));
-    document.getElementById('btnExportar')?.addEventListener('click', () => mostrarNotificacion('Exportando datos...', 'info'));
-    document.getElementById('btnAsociarUsuario')?.addEventListener('click', () => { cargarSelectPersonas(); mostrarModal('asociarUsuarioModal'); });
-    document.getElementById('btnCrearAnuncio')?.addEventListener('click', () => mostrarModal('crearAnuncioModal'));
-    document.getElementById('btnNuevoCurso')?.addEventListener('click', () => mostrarModal('nuevoCursoModal'));
-    document.getElementById('btnExportarEstadisticas')?.addEventListener('click', exportarEstadisticasAExcel);
-    document.getElementById('btnImprimirEstadisticas')?.addEventListener('click', imprimirEstadisticas);
-    
-    const abrirModalPersona = () => {
-        if (usuarioActual?.rol === 'directivo' || usuarioActual?.rol === 'preceptor') {
-            resetearRFID();
-            fotoSeleccionada = null;
-            document.getElementById('previewImage').src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23bdc3c7'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E";
-            document.getElementById('btnEliminarFoto').style.display = 'none';
-            mostrarModal('nuevoAlumnoModal');
-        } else {
-            mostrarNotificacion('No tienes permisos', 'warning');
-        }
-    };
-    document.getElementById('btnNuevaPersona')?.addEventListener('click', abrirModalPersona);
-    document.getElementById('nuevaPersonaBtn')?.addEventListener('click', abrirModalPersona);
-    
-    document.getElementById('fotoPerfil')?.addEventListener('change', (e) => { if (e.target.files?.[0]) manejarSeleccionFoto(e.target.files[0]); });
-    document.getElementById('btnEliminarFoto')?.addEventListener('click', eliminarFotoSeleccionada);
-    document.getElementById('rol')?.addEventListener('change', configurarCampoDinamico);
-    document.getElementById('connectBtn')?.addEventListener('click', conectarRFID);
-    document.getElementById('tarjetaIdManual')?.addEventListener('input', function() { document.getElementById('tarjetaId').value = this.value.toUpperCase(); });
-    document.getElementById('formNuevoAlumno')?.addEventListener('submit', manejarEnvioNuevaPersona);
-    
-    document.getElementById('formNuevoCurso')?.addEventListener('submit', (e) => {
-        e.preventDefault();
-        const anio = document.getElementById('anio').value;
-        const division = document.getElementById('division').value;
-        if (anio && division) {
-            listaCursos.push({ id: Date.now().toString(), anio: parseInt(anio), division: parseInt(division), fechaCreacion: new Date().toISOString() });
-            guardarCursos();
-            cargarTablaCursos();
-            cerrarModal('nuevoCursoModal');
-            mostrarNotificacion('Curso creado', 'success');
-        }
-    });
-    
-    document.getElementById('formAsociarUsuario')?.addEventListener('submit', (e) => {
-        e.preventDefault();
-        const usuario = document.getElementById('nuevoUsuarioNombre').value;
-        const pass = document.getElementById('nuevoUsuarioPass').value;
-        const rol = document.getElementById('nuevoUsuarioRol').value;
-        const idPersona = document.getElementById('selectPersona').value;
-        if (!usuario || !pass || !rol || !idPersona) { mostrarNotificacion('Complete todos los campos', 'warning'); return; }
-        if (pass.length < 4) { mostrarNotificacion('La contraseña debe tener al menos 4 caracteres', 'warning'); return; }
-        if (asociarUsuarioAPersona(usuario, pass, rol, idPersona)) {
-            cerrarModal('asociarUsuarioModal');
-            cargarTablaUsuariosGestion();
-            mostrarNotificacion('Usuario asociado', 'success');
-        }
-    });
-    
-    document.getElementById('formCrearAnuncio')?.addEventListener('submit', (e) => {
-        e.preventDefault();
-        const titulo = document.getElementById('anuncioTitulo').value;
-        const contenido = document.getElementById('anuncioContenido').value;
-        const visibilidad = document.getElementById('anuncioVisibilidad').value;
-        if (titulo && contenido) {
-            crearAnuncio(titulo, contenido, visibilidad);
-            cerrarModal('crearAnuncioModal');
-            mostrarNotificacion('Anuncio publicado', 'success');
-        }
-    });
-    
-    document.getElementById('formConfiguracion')?.addEventListener('submit', (e) => {
-        e.preventDefault();
-        configuracionSistema.tema = document.getElementById('configTema').value;
-        configuracionSistema.autoSave = document.getElementById('configAutoSave').checked;
-        localStorage.setItem('configuracion', JSON.stringify(configuracionSistema));
-        document.body.classList.remove('tema-default', 'tema-dark', 'tema-light');
-        document.body.classList.add(`tema-${configuracionSistema.tema}`);
-        cerrarModal('configuracionModal');
-        mostrarNotificacion('Configuración guardada', 'success');
-    });
-    
-    document.querySelectorAll('#personas .filter-tab').forEach(tab => {
-        tab.addEventListener('click', function() {
-            document.querySelectorAll('#personas .filter-tab').forEach(t => t.classList.remove('active'));
-            this.classList.add('active');
-            cargarTablaPersonasSimplificada(this.dataset.filter);
-        });
-    });
-    
-    document.querySelectorAll('#cursos .filter-tab').forEach(tab => {
-        tab.addEventListener('click', function() {
-            document.querySelectorAll('#cursos .filter-tab').forEach(t => t.classList.remove('active'));
-            this.classList.add('active');
-            cargarTablaCursos(this.dataset.filter);
-        });
-    });
-    
-    document.querySelectorAll('#asistencias .filter-tab').forEach(tab => {
-        tab.addEventListener('click', function() {
-            document.querySelectorAll('#asistencias .filter-tab').forEach(t => t.classList.remove('active'));
-            this.classList.add('active');
-            filtroActual = this.dataset.filter;
-            currentPage = 1;
-            cargarTablaPersonasPrincipal();
-            actualizarEstadisticasRapidas();
-        });
-    });
-    
-    document.getElementById('searchPersonas')?.addEventListener('input', function(e) {
-        const termino = e.target.value.toLowerCase();
-        document.querySelectorAll('#personasTableBody_personas tr').forEach(row => {
-            row.style.display = row.textContent.toLowerCase().includes(termino) ? '' : 'none';
-        });
-    });
-    
-    document.getElementById('searchCursos')?.addEventListener('input', function(e) {
-        const termino = e.target.value.toLowerCase();
-        document.querySelectorAll('#cursosTableBody tr').forEach(row => {
-            row.style.display = row.textContent.toLowerCase().includes(termino) ? '' : 'none';
-        });
-    });
-    
-    document.getElementById('searchInput')?.addEventListener('input', () => { currentPage = 1; cargarTablaPersonasPrincipal(); });
-    document.getElementById('prevPage')?.addEventListener('click', () => { if (currentPage > 1) { currentPage--; cargarTablaPersonasPrincipal(); } });
-    document.getElementById('nextPage')?.addEventListener('click', () => { currentPage++; cargarTablaPersonasPrincipal(); });
-    
-    document.getElementById('btnCambiarEstado')?.addEventListener('click', () => {
-        if (personaActualFicha) {
-            const nuevoEstado = personaActualFicha.estado === 'Presente' ? 'Ausente' : 'Presente';
-            mostrarConfirmacion(`¿Cambiar estado a ${nuevoEstado}?`, () => {
-                personaActualFicha.estado = nuevoEstado;
-                guardarPersonas();
-                cargarTablaPersonasPrincipal();
-                actualizarEstadisticasRapidas();
-                if (usuarioActual?.rol === 'directivo') cargarEstadisticasDetalladas();
-                mostrarFichaAlumno(personaActualFicha.tarjeta_id);
-                mostrarNotificacion(`Estado cambiado a ${nuevoEstado}`, 'success');
-            });
-        }
-    });
-    
-    document.getElementById('btnEliminarFicha')?.addEventListener('click', () => {
-        if (personaActualFicha) {
-            mostrarConfirmacion(`¿Eliminar a ${personaActualFicha.nombre}?`, () => {
-                listaPersonas = listaPersonas.filter(p => p.tarjeta_id !== personaActualFicha.tarjeta_id);
-                guardarPersonas();
-                cargarTablaPersonasPrincipal();
-                cargarTablaPersonasSimplificada();
-                actualizarEstadisticasRapidas();
-                if (usuarioActual?.rol === 'directivo') cargarEstadisticasDetalladas();
-                cerrarModal('fichaAlumnoModal');
-                mostrarNotificacion('Persona eliminada', 'success');
-            });
-        }
-    });
-
-        // ==================== CIERRE DE MODALES GLOBAL ====================
-    // Cerrar modal al hacer clic en la X (close-modal)
-    document.querySelectorAll('.close-modal').forEach(btn => {
-        btn.addEventListener('click', function() {
-            const modal = this.closest('.modal');
-            if (modal) cerrarModal(modal.id);
-        });
-    });
-
-    // Cerrar modal al hacer clic en el botón Cancelar (dentro de modales)
-    document.querySelectorAll('.modal .btn-cancel').forEach(btn => {
-        btn.addEventListener('click', function() {
-            const modal = this.closest('.modal');
-            if (modal) cerrarModal(modal.id);
-        });
-    });
-
-    // Cerrar modal al hacer clic en el overlay (fondo oscuro)
-    document.querySelectorAll('.modal').forEach(modal => {
-        modal.addEventListener('click', function(e) {
-            if (e.target === modal) {
-                cerrarModal(modal.id);
-            }
-        });
-    });
-}
-
 // ==================== EDITAR PERSONA ====================
-
-let personaEditando = null;
-let nuevaFotoEdit = null;
 
 function abrirModalEditarPersona(personaId) {
     const persona = listaPersonas.find(p => p.tarjeta_id === personaId || p.id === personaId);
@@ -1473,11 +1640,9 @@ function abrirModalEditarPersona(personaId) {
     document.getElementById('editTarjetaId').value = persona.tarjeta_id || '';
     document.getElementById('editRol').value = persona.rol;
     
-    // Foto
     const preview = document.getElementById('editPreviewImage');
     preview.src = persona.foto || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23bdc3c7'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E";
     
-    // Configurar campo dinámico
     configurarCampoDinamicoEdicion(persona.rol, persona.detalle);
     
     mostrarModal('editarPersonaModal');
@@ -1551,28 +1716,23 @@ async function guardarEdicionPersona(e) {
     const nuevoDetalle = document.getElementById('editInputDinamico')?.value || '';
     const nuevoRol = document.getElementById('editRol').value;
     
-    // Validación
     if (nuevoRol === 'alumno' && !nuevoDetalle) {
         mostrarNotificacion('Debe seleccionar un curso', 'warning');
         return;
     }
     
-    // Actualizar datos
     personaEditando.nombre = document.getElementById('editNombre').value;
     personaEditando.apellido = document.getElementById('editApellido').value;
     personaEditando.dni = document.getElementById('editDni').value;
     personaEditando.rol = nuevoRol;
     personaEditando.detalle = nuevoDetalle;
     
-    // Actualizar foto si cambió
     if (nuevaFotoEdit) {
         personaEditando.foto = nuevaFotoEdit;
     }
     
-    // Guardar en localStorage
     guardarPersonas();
     
-    // Recargar todas las tablas
     cargarTablaPersonasPrincipal();
     cargarTablaPersonasSimplificada();
     actualizarEstadisticasRapidas();
@@ -1606,143 +1766,7 @@ async function manejarFotoEdit(file) {
     }
 }
 
-// ==================== EXPORTAR ASISTENCIA A EXCEL ====================
-
-function exportarAsistenciaExcel() {
-    const fechaSeleccionada = document.getElementById('fechaAsistencia')?.value || new Date().toISOString().split('T')[0];
-    const filtro = filtroActual || 'todos';
-    
-    let personasFiltradas = listaPersonas;
-    if (filtro !== 'todos') {
-        personasFiltradas = listaPersonas.filter(p => p.rol === filtro);
-    }
-    
-    const searchTerm = document.getElementById('searchInput')?.value.toLowerCase() || '';
-    if (searchTerm) {
-        personasFiltradas = personasFiltradas.filter(p => 
-            p.nombre.toLowerCase().includes(searchTerm) || 
-            p.apellido.toLowerCase().includes(searchTerm) ||
-            (p.tarjeta_id && p.tarjeta_id.toLowerCase().includes(searchTerm))
-        );
-    }
-    
-    // Obtener estado de asistencia para la fecha seleccionada
-    const asistenciasFecha = JSON.parse(localStorage.getItem('asistencias_historico') || '{}');
-    
-    const datos = personasFiltradas.map(p => ({
-        'ID Tarjeta': p.tarjeta_id || '-',
-        'Nombre': p.nombre,
-        'Apellido': p.apellido,
-        'DNI': p.dni || '-',
-        'Rol': p.rol,
-        'Detalle': p.detalle || '-',
-        'Estado': asistenciasFecha[`${p.tarjeta_id}_${fechaSeleccionada}`] || p.estado || 'Presente',
-        'Fecha': fechaSeleccionada
-    }));
-    
-    if (datos.length === 0) {
-        mostrarNotificacion('No hay datos para exportar', 'warning');
-        return;
-    }
-    
-    // Generar CSV
-    const cabeceras = Object.keys(datos[0]);
-    let csv = cabeceras.join(',') + '\n';
-    
-    datos.forEach(fila => {
-        const valores = cabeceras.map(cab => {
-            let valor = fila[cab] || '';
-            if (typeof valor === 'string' && (valor.includes(',') || valor.includes('"'))) {
-                valor = `"${valor.replace(/"/g, '""')}"`;
-            }
-            return valor;
-        });
-        csv += valores.join(',') + '\n';
-    });
-    
-    const blob = new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8;' });
-    const enlace = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    enlace.href = url;
-    enlace.setAttribute('download', `asistencia_${fechaSeleccionada}_${filtro}.csv`);
-    document.body.appendChild(enlace);
-    enlace.click();
-    document.body.removeChild(enlace);
-    URL.revokeObjectURL(url);
-    
-    mostrarNotificacion('Exportado a Excel correctamente', 'success');
-}
-
-// ==================== HISTORIAL DE ASISTENCIA POR FECHA ====================
-
-let fechaActualAsistencia = new Date().toISOString().split('T')[0];
-
-function cargarAsistenciasPorFecha(fecha) {
-    const asistenciasHistorico = JSON.parse(localStorage.getItem('asistencias_historico') || '{}');
-    const fechaStr = fecha || fechaActualAsistencia;
-    
-    // Aplicar el estado guardado a listaPersonas (solo para visualización)
-    listaPersonas.forEach(persona => {
-        const key = `${persona.tarjeta_id}_${fechaStr}`;
-        if (asistenciasHistorico[key]) {
-            persona.estado_original = persona.estado;
-            persona.estado = asistenciasHistorico[key];
-        } else if (fechaStr !== new Date().toISOString().split('T')[0]) {
-            // Para fechas pasadas sin registro, marcar como "Sin registro"
-            persona.estado_original = persona.estado;
-            persona.estado = 'Sin registro';
-        }
-    });
-    
-    // Recargar tabla
-    cargarTablaPersonasPrincipal();
-    
-    // Mostrar indicador de fecha
-    const fechaLabel = document.querySelector('.asistencia-fecha-actual') || (() => {
-        const span = document.createElement('span');
-        span.className = 'asistencia-fecha-actual';
-        const statsBar = document.querySelector('.stats-bar');
-        if (statsBar) statsBar.after(span);
-        return span;
-    })();
-    fechaLabel.innerHTML = `<i class="fas fa-clock"></i> Mostrando asistencia del: ${new Date(fechaStr).toLocaleDateString()}`;
-    
-    // Botón para restaurar estado actual
-    if (!document.getElementById('btnRestaurarHoy')) {
-        const btnRestaurar = document.createElement('button');
-        btnRestaurar.id = 'btnRestaurarHoy';
-        btnRestaurar.className = 'btn btn-sm btn-secondary';
-        btnRestaurar.innerHTML = '<i class="fas fa-undo"></i> Restaurar estado actual';
-        btnRestaurar.style.marginLeft = '1rem';
-        btnRestaurar.onclick = () => cargarAsistenciasPorFecha(new Date().toISOString().split('T')[0]);
-        fechaLabel.appendChild(btnRestaurar);
-    }
-}
-
-function guardarAsistenciaPorFecha(personaId, estado, fecha) {
-    const asistenciasHistorico = JSON.parse(localStorage.getItem('asistencias_historico') || '{}');
-    const key = `${personaId}_${fecha}`;
-    asistenciasHistorico[key] = estado;
-    localStorage.setItem('asistencias_historico', JSON.stringify(asistenciasHistorico));
-}
-
-function cambiarEstadoConFecha(personaId, nuevoEstado, fecha) {
-    const persona = listaPersonas.find(p => p.tarjeta_id === personaId);
-    if (persona) {
-        if (fecha === new Date().toISOString().split('T')[0]) {
-            // Fecha actual: actualizar estado real
-            persona.estado = nuevoEstado;
-            guardarPersonas();
-        } else {
-            // Fecha pasada: guardar en historial
-            guardarAsistenciaPorFecha(personaId, nuevoEstado, fecha);
-        }
-        cargarAsistenciasPorFecha(fecha);
-        mostrarNotificacion(`Estado cambiado a ${nuevoEstado} para la fecha ${fecha}`, 'success');
-    }
-}
-
-// ==================== EXPORTAR TABLA DE PERSONAS ====================
+// ==================== EXPORTAR FUNCIONES ====================
 
 function exportarPersonasExcel() {
     const filtro = document.querySelector('#personas .filter-tab.active')?.dataset.filter || 'todos';
@@ -1835,6 +1859,443 @@ function exportarCursosExcel() {
     URL.revokeObjectURL(url);
     
     mostrarNotificacion('Lista de cursos exportada', 'success');
+}
+
+function exportarAsistenciaExcel() {
+    const fechaSeleccionada = document.getElementById('fechaAsistencia')?.value || new Date().toISOString().split('T')[0];
+    const filtro = filtroActual || 'todos';
+    
+    let personasFiltradas = listaPersonas;
+    if (filtro !== 'todos') {
+        personasFiltradas = listaPersonas.filter(p => p.rol === filtro);
+    }
+    
+    const searchTerm = document.getElementById('searchInput')?.value.toLowerCase() || '';
+    if (searchTerm) {
+        personasFiltradas = personasFiltradas.filter(p => 
+            p.nombre.toLowerCase().includes(searchTerm) || 
+            p.apellido.toLowerCase().includes(searchTerm) ||
+            (p.tarjeta_id && p.tarjeta_id.toLowerCase().includes(searchTerm))
+        );
+    }
+    
+    const asistenciasFecha = JSON.parse(localStorage.getItem('asistencias_historico') || '{}');
+    
+    const datos = personasFiltradas.map(p => ({
+        'ID Tarjeta': p.tarjeta_id || '-',
+        'Nombre': p.nombre,
+        'Apellido': p.apellido,
+        'DNI': p.dni || '-',
+        'Rol': p.rol,
+        'Detalle': p.detalle || '-',
+        'Estado': asistenciasFecha[`${p.tarjeta_id}_${fechaSeleccionada}`] || p.estado || 'Presente',
+        'Fecha': fechaSeleccionada
+    }));
+    
+    if (datos.length === 0) {
+        mostrarNotificacion('No hay datos para exportar', 'warning');
+        return;
+    }
+    
+    const cabeceras = Object.keys(datos[0]);
+    let csv = cabeceras.join(',') + '\n';
+    
+    datos.forEach(fila => {
+        const valores = cabeceras.map(cab => {
+            let valor = fila[cab] || '';
+            if (typeof valor === 'string' && (valor.includes(',') || valor.includes('"'))) {
+                valor = `"${valor.replace(/"/g, '""')}"`;
+            }
+            return valor;
+        });
+        csv += valores.join(',') + '\n';
+    });
+    
+    const blob = new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8;' });
+    const enlace = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    enlace.href = url;
+    enlace.setAttribute('download', `asistencia_${fechaSeleccionada}_${filtro}.csv`);
+    document.body.appendChild(enlace);
+    enlace.click();
+    document.body.removeChild(enlace);
+    URL.revokeObjectURL(url);
+    
+    mostrarNotificacion('Exportado a Excel correctamente', 'success');
+}
+
+// ==================== HISTORIAL DE ASISTENCIA POR FECHA ====================
+
+function cargarAsistenciasPorFecha(fecha) {
+    const asistenciasHistorico = JSON.parse(localStorage.getItem('asistencias_historico') || '{}');
+    const fechaStr = fecha || fechaActualAsistencia;
+    
+    listaPersonas.forEach(persona => {
+        const key = `${persona.tarjeta_id}_${fechaStr}`;
+        if (asistenciasHistorico[key]) {
+            persona.estado_original = persona.estado;
+            persona.estado = asistenciasHistorico[key];
+        } else if (fechaStr !== new Date().toISOString().split('T')[0]) {
+            persona.estado_original = persona.estado;
+            persona.estado = 'Sin registro';
+        }
+    });
+    
+    cargarTablaPersonasPrincipal();
+    
+    let fechaLabel = document.querySelector('.asistencia-fecha-actual');
+    if (!fechaLabel) {
+        fechaLabel = document.createElement('div');
+        fechaLabel.className = 'asistencia-fecha-actual';
+        const statsBar = document.querySelector('.stats-bar');
+        if (statsBar) statsBar.insertAdjacentElement('afterend', fechaLabel);
+    }
+    fechaLabel.innerHTML = `<i class="fas fa-clock"></i> Mostrando asistencia del: ${new Date(fechaStr).toLocaleDateString()}`;
+    
+    if (!document.getElementById('btnRestaurarHoy')) {
+        const btnRestaurar = document.createElement('button');
+        btnRestaurar.id = 'btnRestaurarHoy';
+        btnRestaurar.className = 'btn btn-sm btn-secondary';
+        btnRestaurar.innerHTML = '<i class="fas fa-undo"></i> Restaurar estado actual';
+        btnRestaurar.style.marginLeft = '1rem';
+        btnRestaurar.onclick = () => cargarAsistenciasPorFecha(new Date().toISOString().split('T')[0]);
+        fechaLabel.appendChild(btnRestaurar);
+    }
+}
+
+function guardarAsistenciaPorFecha(personaId, estado, fecha) {
+    const asistenciasHistorico = JSON.parse(localStorage.getItem('asistencias_historico') || '{}');
+    const key = `${personaId}_${fecha}`;
+    asistenciasHistorico[key] = estado;
+    localStorage.setItem('asistencias_historico', JSON.stringify(asistenciasHistorico));
+}
+
+function cambiarEstadoConFecha(personaId, nuevoEstado, fecha) {
+    const persona = listaPersonas.find(p => p.tarjeta_id === personaId);
+    if (persona) {
+        if (fecha === new Date().toISOString().split('T')[0]) {
+            persona.estado = nuevoEstado;
+            guardarPersonas();
+        } else {
+            guardarAsistenciaPorFecha(personaId, nuevoEstado, fecha);
+        }
+        cargarAsistenciasPorFecha(fecha);
+        mostrarNotificacion(`Estado cambiado a ${nuevoEstado} para la fecha ${fecha}`, 'success');
+    }
+}
+
+// ==================== INICIALIZACIÓN DE EVENTOS ====================
+
+function inicializarEventListeners() {
+    const menuToggle = document.getElementById('menuToggle');
+    const closeSidebarBtn = document.getElementById('closeSidebar');
+    const overlay = document.getElementById('overlay');
+    
+    menuToggle?.addEventListener('click', () => {
+        document.getElementById('sidebar').classList.add('active');
+        overlay.classList.add('active');
+        document.body.style.overflow = 'hidden';
+    });
+    
+    const cerrarSidebarFn = () => {
+        document.getElementById('sidebar').classList.remove('active');
+        overlay?.classList.remove('active');
+        document.body.style.overflow = 'auto';
+    };
+    closeSidebarBtn?.addEventListener('click', cerrarSidebarFn);
+    overlay?.addEventListener('click', cerrarSidebarFn);
+    
+    document.getElementById('btnLogoutHeader')?.addEventListener('click', cerrarSesion);
+    document.getElementById('btnConfiguracion')?.addEventListener('click', () => mostrarModal('configuracionModal'));
+    document.getElementById('btnExportar')?.addEventListener('click', () => mostrarNotificacion('Exportando datos...', 'info'));
+    document.getElementById('btnAsociarUsuario')?.addEventListener('click', () => { cargarSelectPersonas(); mostrarModal('asociarUsuarioModal'); });
+    document.getElementById('btnCrearAnuncio')?.addEventListener('click', () => mostrarModal('crearAnuncioModal'));
+    document.getElementById('btnNuevoCurso')?.addEventListener('click', () => mostrarModal('nuevoCursoModal'));
+    document.getElementById('btnExportarEstadisticas')?.addEventListener('click', exportarEstadisticasAExcel);
+    document.getElementById('btnImprimirEstadisticas')?.addEventListener('click', imprimirEstadisticas);
+    
+    const abrirModalPersona = () => {
+        if (usuarioActual?.rol === 'directivo' || usuarioActual?.rol === 'preceptor') {
+            resetearRFID();
+            fotoSeleccionada = null;
+            document.getElementById('previewImage').src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23bdc3c7'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E";
+            document.getElementById('btnEliminarFoto').style.display = 'none';
+            mostrarModal('nuevoAlumnoModal');
+        } else {
+            mostrarNotificacion('No tienes permisos', 'warning');
+        }
+    };
+    document.getElementById('btnNuevaPersona')?.addEventListener('click', abrirModalPersona);
+    document.getElementById('nuevaPersonaBtn')?.addEventListener('click', abrirModalPersona);
+    
+    document.getElementById('fotoPerfil')?.addEventListener('change', (e) => { if (e.target.files?.[0]) manejarSeleccionFoto(e.target.files[0]); });
+    document.getElementById('btnEliminarFoto')?.addEventListener('click', eliminarFotoSeleccionada);
+    document.getElementById('rol')?.addEventListener('change', configurarCampoDinamico);
+    document.getElementById('connectBtn')?.addEventListener('click', conectarRFID);
+    document.getElementById('tarjetaIdManual')?.addEventListener('input', function() { document.getElementById('tarjetaId').value = this.value.toUpperCase(); });
+    document.getElementById('formNuevoAlumno')?.addEventListener('submit', manejarEnvioNuevaPersona);
+    document.getElementById('formEditarPersona')?.addEventListener('submit', guardarEdicionPersona);
+    document.getElementById('editFotoPerfil')?.addEventListener('change', (e) => { if (e.target.files?.[0]) manejarFotoEdit(e.target.files[0]); });
+    document.getElementById('btnEliminarFotoEdit')?.addEventListener('click', () => {
+        nuevaFotoEdit = null;
+        document.getElementById('editPreviewImage').src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23bdc3c7'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E";
+        mostrarNotificacion('Foto eliminada', 'info');
+    });
+    document.getElementById('editRol')?.addEventListener('change', function() { configurarCampoDinamicoEdicion(this.value, ''); });
+    
+    document.getElementById('formNuevoCurso')?.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const anio = document.getElementById('anio').value;
+        const division = document.getElementById('division').value;
+        if (anio && division) {
+            listaCursos.push({ id: Date.now().toString(), anio: parseInt(anio), division: parseInt(division), fechaCreacion: new Date().toISOString() });
+            guardarCursos();
+            cargarTablaCursos();
+            cerrarModal('nuevoCursoModal');
+            mostrarNotificacion('Curso creado', 'success');
+        }
+    });
+    
+    document.getElementById('formAsociarUsuario')?.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const usuario = document.getElementById('nuevoUsuarioNombre').value;
+        const pass = document.getElementById('nuevoUsuarioPass').value;
+        const rol = document.getElementById('nuevoUsuarioRol').value;
+        const idPersona = document.getElementById('selectPersona').value;
+        if (!usuario || !pass || !rol || !idPersona) { mostrarNotificacion('Complete todos los campos', 'warning'); return; }
+        if (pass.length < 4) { mostrarNotificacion('La contraseña debe tener al menos 4 caracteres', 'warning'); return; }
+        if (asociarUsuarioAPersona(usuario, pass, rol, idPersona)) {
+            cerrarModal('asociarUsuarioModal');
+            cargarTablaUsuariosGestion();
+            mostrarNotificacion('Usuario asociado', 'success');
+        }
+    });
+    
+    document.getElementById('formCrearAnuncio')?.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const titulo = document.getElementById('anuncioTitulo').value;
+        const contenido = document.getElementById('anuncioContenido').value;
+        const visibilidad = document.getElementById('anuncioVisibilidad').value;
+        if (titulo && contenido) {
+            crearAnuncio(titulo, contenido, visibilidad);
+            cerrarModal('crearAnuncioModal');
+            mostrarNotificacion('Anuncio publicado', 'success');
+        }
+    });
+    
+    document.getElementById('formConfiguracion')?.addEventListener('submit', (e) => {
+        e.preventDefault();
+        configuracionSistema.tema = document.getElementById('configTema').value;
+        configuracionSistema.autoSave = document.getElementById('configAutoSave').checked;
+        localStorage.setItem('configuracion', JSON.stringify(configuracionSistema));
+        document.body.classList.remove('tema-default', 'tema-dark', 'tema-light');
+        document.body.classList.add(`tema-${configuracionSistema.tema}`);
+        cerrarModal('configuracionModal');
+        mostrarNotificacion('Configuración guardada', 'success');
+    });
+    
+    document.getElementById('btnCargarAsistenciaFecha')?.addEventListener('click', () => {
+        const fecha = document.getElementById('fechaAsistencia').value;
+        if (fecha) {
+            fechaActualAsistencia = fecha;
+            cargarAsistenciasPorFecha(fecha);
+        }
+    });
+    
+    document.getElementById('btnHoy')?.addEventListener('click', () => {
+        const hoy = new Date().toISOString().split('T')[0];
+        document.getElementById('fechaAsistencia').value = hoy;
+        fechaActualAsistencia = hoy;
+        listaPersonas.forEach(p => {
+            if (p.estado_original) {
+                p.estado = p.estado_original;
+                delete p.estado_original;
+            }
+        });
+        guardarPersonas();
+        cargarAsistenciasPorFecha(hoy);
+    });
+    
+    document.getElementById('btnExportarAsistenciaExcel')?.addEventListener('click', exportarAsistenciaExcel);
+    
+    document.querySelectorAll('#personas .filter-tab').forEach(tab => {
+        tab.addEventListener('click', function() {
+            document.querySelectorAll('#personas .filter-tab').forEach(t => t.classList.remove('active'));
+            this.classList.add('active');
+            cargarTablaPersonasSimplificada(this.dataset.filter);
+        });
+    });
+    
+    document.querySelectorAll('#cursos .filter-tab').forEach(tab => {
+        tab.addEventListener('click', function() {
+            document.querySelectorAll('#cursos .filter-tab').forEach(t => t.classList.remove('active'));
+            this.classList.add('active');
+            cargarTablaCursos(this.dataset.filter);
+        });
+    });
+    
+    document.querySelectorAll('#asistencias .filter-tab').forEach(tab => {
+        tab.addEventListener('click', function() {
+            document.querySelectorAll('#asistencias .filter-tab').forEach(t => t.classList.remove('active'));
+            this.classList.add('active');
+            filtroActual = this.dataset.filter;
+            currentPage = 1;
+            cargarTablaPersonasPrincipal();
+            actualizarEstadisticasRapidas();
+        });
+    });
+    
+    document.getElementById('searchPersonas')?.addEventListener('input', function(e) {
+        const termino = e.target.value.toLowerCase();
+        document.querySelectorAll('#personasTableBody_personas tr').forEach(row => {
+            row.style.display = row.textContent.toLowerCase().includes(termino) ? '' : 'none';
+        });
+    });
+    
+    document.getElementById('searchCursos')?.addEventListener('input', function(e) {
+        const termino = e.target.value.toLowerCase();
+        document.querySelectorAll('#cursosTableBody tr').forEach(row => {
+            row.style.display = row.textContent.toLowerCase().includes(termino) ? '' : 'none';
+        });
+    });
+    
+    document.getElementById('searchInput')?.addEventListener('input', () => { currentPage = 1; cargarTablaPersonasPrincipal(); });
+    document.getElementById('prevPage')?.addEventListener('click', () => { if (currentPage > 1) { currentPage--; cargarTablaPersonasPrincipal(); } });
+    document.getElementById('nextPage')?.addEventListener('click', () => { currentPage++; cargarTablaPersonasPrincipal(); });
+    
+    document.getElementById('btnCambiarEstado')?.addEventListener('click', () => {
+        if (personaActualFicha) {
+            const nuevoEstado = personaActualFicha.estado === 'Presente' ? 'Ausente' : 'Presente';
+            mostrarConfirmacion(`¿Cambiar estado a ${nuevoEstado}?`, () => {
+                personaActualFicha.estado = nuevoEstado;
+                guardarPersonas();
+                cargarTablaPersonasPrincipal();
+                actualizarEstadisticasRapidas();
+                if (usuarioActual?.rol === 'directivo') cargarEstadisticasDetalladas();
+                mostrarFichaAlumno(personaActualFicha.tarjeta_id);
+                mostrarNotificacion(`Estado cambiado a ${nuevoEstado}`, 'success');
+            });
+        }
+    });
+    
+    document.getElementById('btnEliminarFicha')?.addEventListener('click', () => {
+        if (personaActualFicha) {
+            mostrarConfirmacion(`¿Eliminar a ${personaActualFicha.nombre}?`, () => {
+                listaPersonas = listaPersonas.filter(p => p.tarjeta_id !== personaActualFicha.tarjeta_id);
+                guardarPersonas();
+                cargarTablaPersonasPrincipal();
+                cargarTablaPersonasSimplificada();
+                actualizarEstadisticasRapidas();
+                if (usuarioActual?.rol === 'directivo') cargarEstadisticasDetalladas();
+                cerrarModal('fichaAlumnoModal');
+                mostrarNotificacion('Persona eliminada', 'success');
+            });
+        }
+    });
+    
+    const personasActionGroup = document.querySelector('#personas .action-group');
+    if (personasActionGroup && !document.getElementById('exportarPersonasBtn')) {
+        const btnExportarPersonas = document.createElement('button');
+        btnExportarPersonas.id = 'exportarPersonasBtn';
+        btnExportarPersonas.innerHTML = '<i class="fas fa-file-excel"></i> Exportar Excel';
+        btnExportarPersonas.className = 'btn btn-excel btn-sm';
+        btnExportarPersonas.onclick = exportarPersonasExcel;
+        personasActionGroup.appendChild(btnExportarPersonas);
+    }
+    
+    const cursosActionGroup = document.querySelector('#cursos .action-group');
+    if (cursosActionGroup && !document.getElementById('exportarCursosBtn')) {
+        const btnExportarCursos = document.createElement('button');
+        btnExportarCursos.id = 'exportarCursosBtn';
+        btnExportarCursos.innerHTML = '<i class="fas fa-file-excel"></i> Exportar Excel';
+        btnExportarCursos.className = 'btn btn-excel btn-sm';
+        btnExportarCursos.onclick = exportarCursosExcel;
+        cursosActionGroup.appendChild(btnExportarCursos);
+    }
+
+    // Profesores
+    const btnNuevoProfesor = document.getElementById('btnNuevoProfesor');
+    if (btnNuevoProfesor) btnNuevoProfesor.addEventListener('click', abrirModalNuevoProfesor);
+    
+    const btnAgregarMateria = document.getElementById('btnAgregarMateria');
+    if (btnAgregarMateria) btnAgregarMateria.addEventListener('click', agregarMateria);
+    
+    const btnAgregarHorario = document.getElementById('btnAgregarHorario');
+    if (btnAgregarHorario) btnAgregarHorario.addEventListener('click', agregarHorario);
+    
+    const formProfesor = document.getElementById('formProfesor');
+    if (formProfesor) formProfesor.addEventListener('submit', guardarProfesor);
+    
+    const btnExportarProfesores = document.getElementById('btnExportarProfesores');
+    if (btnExportarProfesores) btnExportarProfesores.addEventListener('click', exportarProfesoresExcel);
+    
+    const profesorFoto = document.getElementById('profesorFoto');
+    if (profesorFoto) {
+        profesorFoto.addEventListener('change', (e) => {
+            if (e.target.files?.[0]) {
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                    const preview = document.getElementById('profesorPreviewImage');
+                    if (preview) preview.src = ev.target.result;
+                };
+                reader.readAsDataURL(e.target.files[0]);
+            }
+        });
+    }
+    
+    const btnEliminarFotoProfesor = document.getElementById('btnEliminarFotoProfesor');
+    if (btnEliminarFotoProfesor) {
+        btnEliminarFotoProfesor.addEventListener('click', () => {
+            const preview = document.getElementById('profesorPreviewImage');
+            if (preview) preview.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23bdc3c7'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E";
+            const input = document.getElementById('profesorFoto');
+            if (input) input.value = '';
+        });
+    }
+
+    const profesorFiltros = document.querySelectorAll('#profesoresFiltros .filter-tab');
+    profesorFiltros.forEach(tab => {
+        tab.addEventListener('click', function() {
+            profesorFiltros.forEach(t => t.classList.remove('active'));
+            this.classList.add('active');
+            cargarTablaProfesores();
+        });
+    });
+
+    const searchProfesores = document.getElementById('searchProfesores');
+    if (searchProfesores) searchProfesores.addEventListener('input', () => cargarTablaProfesores());
+}
+
+// ==================== REINICIALIZAR EVENT LISTENERS GLOBALES ====================
+
+function reinicializarEventListenersGlobales() {
+    document.querySelectorAll('.close-modal').forEach(btn => {
+        btn.removeEventListener('click', btn._closeModalHandler);
+        btn._closeModalHandler = function() {
+            const modal = this.closest('.modal');
+            if (modal) cerrarModal(modal.id);
+        };
+        btn.addEventListener('click', btn._closeModalHandler);
+    });
+
+    document.querySelectorAll('.modal .btn-cancel').forEach(btn => {
+        btn.removeEventListener('click', btn._cancelHandler);
+        btn._cancelHandler = function() {
+            const modal = this.closest('.modal');
+            if (modal) cerrarModal(modal.id);
+        };
+        btn.addEventListener('click', btn._cancelHandler);
+    });
+
+    document.querySelectorAll('.modal').forEach(modal => {
+        modal.removeEventListener('click', modal._overlayHandler);
+        modal._overlayHandler = function(e) {
+            if (e.target === modal) {
+                cerrarModal(modal.id);
+            }
+        };
+        modal.addEventListener('click', modal._overlayHandler);
+    });
 }
 
 // ==================== INICIO DEL SISTEMA ====================

@@ -10,27 +10,36 @@
 <body>
     <!-- ==================== PANEL LATERAL (SIDEBAR) ==================== -->
     <div id="sidebar" class="sidebar">
-        <div class="sidebar-header">
-            <div class="user-profile-sidebar" id="userProfileSidebar">
-                <div class="user-avatar-sidebar" id="userAvatarSidebar">
-                    <i class="fas fa-user-circle"></i>
-                </div>
-                <div class="user-info-sidebar" id="userInfoSidebar">
-                    <span class="user-name-sidebar" id="sidebarUserName">Invitado</span>
-                    <span class="user-role-sidebar" id="sidebarUserRole"></span>
-                    <span class="user-course-sidebar" id="sidebarUserCourse"></span>
-                </div>
-            </div>
-            <button id="closeSidebar" class="close-btn">
-                <i class="fas fa-times"></i>
-            </button>
+    <button id="closeSidebar" class="close-btn">
+        <i class="fas fa-times"></i>
+    </button>
+    
+    <div class="sidebar-header">
+        <!-- Logo -->
+        <div class="sidebar-logo">
+            <h3><i class="fas fa-school"></i> Sistema Escolar</h3>
+            <p>Gestión de Asistencia RFID</p>
         </div>
-        <nav class="sidebar-nav">
-            <ul id="sidebarMenu">
-                <!-- El menú se genera dinámicamente según el rol -->
-            </ul>
-        </nav>
+        
+        <!-- Perfil de usuario -->
+        <div class="user-profile-sidebar" id="userProfileSidebar">
+            <div class="user-avatar-sidebar" id="userAvatarSidebar">
+                <i class="fas fa-user-circle"></i>
+            </div>
+            <div class="user-info-sidebar" id="userInfoSidebar">
+                <span class="user-name-sidebar" id="sidebarUserName">Invitado</span>
+                <span class="user-role-sidebar" id="sidebarUserRole"></span>
+                <span class="user-course-sidebar" id="sidebarUserCourse"></span>
+            </div>
+        </div>
     </div>
+    
+    <nav class="sidebar-nav">
+        <div id="sidebarMenuContainer">
+            <!-- El menú se genera dinámicamente -->
+        </div>
+    </nav>
+</div>
 
     <!-- Overlay para cerrar panel en móviles -->
     <div id="overlay" class="overlay"></div>
@@ -953,6 +962,167 @@
                                 <button type="submit" class="btn btn-primary">Guardar Cambios</button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            </div>
+
+                        <!-- Modal de Nuevo/Editar Profesor -->
+            <div id="profesorModal" class="modal">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3 id="profesorModalTitle"><i class="fas fa-chalkboard-teacher"></i> Nuevo Profesor</h3>
+                        <button class="close-modal">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="formProfesor">
+                            <input type="hidden" id="profesorId">
+                            
+                            <div class="photo-upload-container">
+                                <div class="photo-preview">
+                                    <img id="profesorPreviewImage" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23bdc3c7'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E" alt="Foto" class="foto-edit-preview">
+                                </div>
+                                <div class="photo-upload-controls">
+                                    <label for="profesorFoto" class="btn btn-secondary btn-sm">
+                                        <i class="fas fa-camera"></i> Seleccionar foto
+                                    </label>
+                                    <input type="file" id="profesorFoto" accept="image/*" style="display: none;">
+                                    <button type="button" id="btnEliminarFotoProfesor" class="btn btn-cancel btn-sm">
+                                        <i class="fas fa-trash"></i> Eliminar
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label><i class="fas fa-user"></i> Nombre</label>
+                                    <input type="text" id="profesorNombre" required>
+                                </div>
+                                <div class="form-group">
+                                    <label><i class="fas fa-user-tag"></i> Apellido</label>
+                                    <input type="text" id="profesorApellido" required>
+                                </div>
+                            </div>
+                            
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label><i class="fas fa-envelope"></i> Email</label>
+                                    <input type="email" id="profesorEmail" placeholder="profesor@escuela.edu">
+                                </div>
+                                <div class="form-group">
+                                    <label><i class="fas fa-phone"></i> Teléfono</label>
+                                    <input type="text" id="profesorTelefono" placeholder="Ej: 1234-5678">
+                                </div>
+                            </div>
+                            
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label><i class="fas fa-id-card"></i> DNI</label>
+                                    <input type="text" id="profesorDni">
+                                </div>
+                                <div class="form-group">
+                                    <label><i class="fas fa-calendar-alt"></i> Fecha Ingreso</label>
+                                    <input type="date" id="profesorFechaIngreso">
+                                </div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label><i class="fas fa-book"></i> Materias</label>
+                                <div id="materiasContainer" class="materias-container">
+                                    <!-- Materias se agregan dinámicamente -->
+                                </div>
+                                <button type="button" id="btnAgregarMateria" class="btn btn-sm btn-secondary" style="margin-top: 0.5rem;">
+                                    <i class="fas fa-plus"></i> Agregar Materia
+                                </button>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label><i class="fas fa-clock"></i> Horario Semanal</label>
+                                <div id="horarioContainer" class="horario-container">
+                                    <!-- Horario se agrega dinámicamente -->
+                                </div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label><i class="fas fa-toggle-on"></i> Estado</label>
+                                <select id="profesorEstado">
+                                    <option value="activo">Activo</option>
+                                    <option value="inactivo">Inactivo</option>
+                                </select>
+                            </div>
+                            
+                            <div class="modal-actions">
+                                <button type="button" class="btn btn-cancel close-modal">Cancelar</button>
+                                <button type="submit" class="btn btn-primary">Guardar Profesor</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+                        <!-- Modal de Perfil del Profesor -->
+            <div id="perfilProfesorModal" class="modal">
+                <div class="modal-content modal-large">
+                    <div class="modal-header">
+                        <h3><i class="fas fa-id-card"></i> Perfil del Profesor</h3>
+                        <button class="close-modal">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="perfil-profesor-container">
+                            <div class="perfil-foto">
+                                <img id="perfilProfesorFoto" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23bdc3c7'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E" alt="Foto">
+                            </div>
+                            <div class="perfil-datos">
+                                <h4 id="perfilProfesorNombre"></h4>
+                                <div class="perfil-info-grid">
+                                    <div class="perfil-item">
+                                        <label>Email:</label>
+                                        <span id="perfilProfesorEmail">-</span>
+                                    </div>
+                                    <div class="perfil-item">
+                                        <label>Teléfono:</label>
+                                        <span id="perfilProfesorTelefono">-</span>
+                                    </div>
+                                    <div class="perfil-item">
+                                        <label>DNI:</label>
+                                        <span id="perfilProfesorDni">-</span>
+                                    </div>
+                                    <div class="perfil-item">
+                                        <label>Fecha Ingreso:</label>
+                                        <span id="perfilProfesorFechaIngreso">-</span>
+                                    </div>
+                                    <div class="perfil-item">
+                                        <label>Estado:</label>
+                                        <span id="perfilProfesorEstado" class="status"></span>
+                                    </div>
+                                </div>
+                                
+                                <div class="perfil-materias">
+                                    <h5><i class="fas fa-book"></i> Materias</h5>
+                                    <div id="perfilMateriasList" class="materias-list"></div>
+                                </div>
+                                
+                                <div class="perfil-horario">
+                                    <h5><i class="fas fa-calendar-week"></i> Horario Semanal</h5>
+                                    <div id="perfilHorarioTable" class="horario-table"></div>
+                                </div>
+                                
+                                <div class="perfil-actions">
+                                    <button id="btnEditarPerfilProfesor" class="btn btn-primary">
+                                        <i class="fas fa-edit"></i> Editar
+                                    </button>
+                                    <button id="btnEliminarPerfilProfesor" class="btn btn-cancel">
+                                        <i class="fas fa-trash"></i> Eliminar
+                                    </button>
+                                    <button id="btnAsistenciaProfesor" class="btn btn-secondary">
+                                        <i class="fas fa-clipboard-list"></i> Ver Asistencia
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
